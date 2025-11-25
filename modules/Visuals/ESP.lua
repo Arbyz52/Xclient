@@ -7,7 +7,7 @@ local module = {
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
--- Цвета 1–9
+-- Цветовая палитра
 local palette = {
     [Enum.KeyCode.One]   = Color3.fromRGB(255, 70, 70),
     [Enum.KeyCode.Two]   = Color3.fromRGB(255, 150, 0),
@@ -20,34 +20,33 @@ local palette = {
     [Enum.KeyCode.Nine]  = Color3.fromRGB(255, 255, 255),
 }
 
--- Состояние
+-- Настройки
 module._tintColor = palette[Enum.KeyCode.Five]
 module._esp = {}
 module._connection = nil
 
--- Создать ESP для игрока
-local function addESP(player, color)
+-- Создание ESP
+local function addESP(player)
     if player == Players.LocalPlayer then return end
     if not player.Character then return end
     if module._esp[player] then return end
 
     local hl = Instance.new("Highlight")
     hl.Adornee = player.Character
-    hl.FillTransparency = 0.7
-    hl.OutlineColor = color
+    hl.FillTransparency = 0.5
+    hl.OutlineColor = module._tintColor
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     hl.Parent = player.Character
 
     module._esp[player] = hl
 
-    -- При респавне перепривязываем
     player.CharacterAdded:Connect(function(char)
         hl.Adornee = char
         hl.Parent = char
     end)
 end
 
--- Удалить ESP
+-- Удаление ESP
 local function removeESP(player)
     local hl = module._esp[player]
     if hl then
@@ -56,7 +55,7 @@ local function removeESP(player)
     end
 end
 
--- Перекрасить все ESP
+-- Обновление цвета
 function module:RetintAll(color)
     for _, hl in pairs(self._esp) do
         if hl and hl.Parent then
@@ -65,33 +64,38 @@ function module:RetintAll(color)
     end
 end
 
--- Сбросить все ESP
+-- Сброс ESP
 function module:ResetAll()
-    for plr, hl in pairs(self._esp) do
+    for _, hl in pairs(self._esp) do
         if hl then hl:Destroy() end
     end
     self._esp = {}
 end
 
+-- Инициализация
 function module:Init()
     print("[ESP] Init")
 end
 
+-- Включение
 function module:OnEnable()
     print("[ESP] Enabled!")
     self.Enabled = true
 
-    -- Создать ESP для всех игроков
     for _, plr in ipairs(Players:GetPlayers()) do
-        addESP(plr, self._tintColor)
+        addESP(plr)
     end
 
-    -- Новые игроки
     Players.PlayerAdded:Connect(function(plr)
-        addESP(plr, self._tintColor)
+        plr.CharacterAdded:Connect(function()
+            addESP(plr)
+        end)
     end)
 
-    -- Обработка клавиш
+    Players.PlayerRemoving:Connect(function(plr)
+        removeESP(plr)
+    end)
+
     self._connection = UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
         if not self.Enabled then return end
@@ -101,17 +105,14 @@ function module:OnEnable()
             self._tintColor = newColor
             self:RetintAll(newColor)
             print("[ESP] Color changed")
-            return
-        end
-
-        if input.KeyCode == Enum.KeyCode.T then
+        elseif input.KeyCode == Enum.KeyCode.T then
             self:ResetAll()
             print("[ESP] Reset all")
-            return
         end
     end)
 end
 
+-- Выключение
 function module:OnDisable()
     print("[ESP] Disabled!")
     self.Enabled = false
@@ -124,8 +125,8 @@ function module:OnDisable()
     self:ResetAll()
 end
 
+-- Тик (не используется)
 function module:OnTick(dt)
-    -- Не используется
 end
 
 return module
