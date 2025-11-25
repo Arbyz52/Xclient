@@ -9,6 +9,11 @@
       "path": "modules/Visuals/ESP.lua",
       "category": "Visuals",
       "name": "ESP"
+    },
+    {
+      "path": "modules/Visuals/Fly.lua",
+      "category": "Visuals",
+      "name": "Fly"
     }
   ]
 }
