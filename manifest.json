@@ -1,0 +1,9 @@
+{
+  "modules": [
+    {
+      "path": "modules/Misc/Example.lua",
+      "category": "Misc",
+      "name": "Example"
+    }
+  ]
+}
