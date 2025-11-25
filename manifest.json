@@ -4,6 +4,11 @@
       "path": "modules/Misc/Example.lua",
       "category": "Misc",
       "name": "Example"
+    },
+    {
+      "path": "modules/Combat/KillAura.lua",
+      "category": "Combat",
+      "name": "KillAura"
     }
   ]
 }
