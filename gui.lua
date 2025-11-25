@@ -1,4 +1,4 @@
--- ===================== gui.lua ======================
+-- ===================== gui.lua (Xclient) ======================
 
 local Gui = {}
 
@@ -7,7 +7,7 @@ function Gui.Init(ModuleManager)
     local CoreGui          = game:GetService("CoreGui")
 
     ---------------------------------------------------
-    -- ScreenGui и затемнение фона
+    -- ScreenGui + затемнение
     ---------------------------------------------------
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "XclientMenu"
@@ -28,7 +28,7 @@ function Gui.Init(ModuleManager)
     overlay.Parent = screenGui
 
     ---------------------------------------------------
-    -- Главный контейнер
+    -- Главное окно
     ---------------------------------------------------
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
@@ -39,8 +39,7 @@ function Gui.Init(ModuleManager)
     mainFrame.BorderSizePixel = 0
     mainFrame.Parent = overlay
 
-    local uiCorner = Instance.new("UICorner", mainFrame)
-    uiCorner.CornerRadius = UDim.new(0, 10)
+    Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 
     local stroke = Instance.new("UIStroke", mainFrame)
     stroke.Color = Color3.fromRGB(60, 60, 80)
@@ -50,11 +49,11 @@ function Gui.Init(ModuleManager)
     layout.FillDirection = Enum.FillDirection.Horizontal
     layout.Padding = UDim.new(0, 12)
 
-    ---------------------------------------------------
-    -- Списки модулей + поиск
-    ---------------------------------------------------
-    local allButtons = {}  -- {button=..., mod=...}
+    local allButtons = {} -- {button=..., mod=...}
 
+    ---------------------------------------------------
+    -- Одна колонка категории
+    ---------------------------------------------------
     local function createCategoryColumn(categoryName, modules)
         table.sort(modules, function(a, b)
             return (a.Name or "") < (b.Name or "")
@@ -62,27 +61,26 @@ function Gui.Init(ModuleManager)
 
         local colFrame = Instance.new("Frame")
         colFrame.Name = categoryName
-        colFrame.Size = UDim2.new(0, 170, 1, -50)  -- место снизу под поиск
+        colFrame.Size = UDim2.new(0, 170, 1, -50) -- оставляем низ под поиск
         colFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
         colFrame.BorderSizePixel = 0
         colFrame.Parent = mainFrame
 
-        local colCorner = Instance.new("UICorner", colFrame)
-        colCorner.CornerRadius = UDim.new(0, 8)
+        Instance.new("UICorner", colFrame).CornerRadius = UDim.new(0, 8)
 
         local colStroke = Instance.new("UIStroke", colFrame)
         colStroke.Color = Color3.fromRGB(50, 50, 70)
         colStroke.Thickness = 1
 
-        local titleBar = Instance.new("Frame", colFrame)
+        local titleBar = Instance.new("Frame")
         titleBar.Size = UDim2.new(1, 0, 0, 28)
         titleBar.BackgroundColor3 = Color3.fromRGB(24, 24, 36)
         titleBar.BorderSizePixel = 0
+        titleBar.Parent = colFrame
 
         Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 8)
 
-        local title = Instance.new("TextLabel", titleBar)
-        title.Name = "Title"
+        local title = Instance.new("TextLabel")
         title.Size = UDim2.new(1, -16, 1, 0)
         title.Position = UDim2.new(0, 8, 0, 0)
         title.BackgroundTransparency = 1
@@ -91,12 +89,14 @@ function Gui.Init(ModuleManager)
         title.TextColor3 = Color3.fromRGB(230, 230, 240)
         title.TextSize = 18
         title.TextXAlignment = Enum.TextXAlignment.Left
+        title.Parent = titleBar
 
-        local holder = Instance.new("Frame", colFrame)
+        local holder = Instance.new("Frame")
         holder.Name = "ButtonsHolder"
         holder.Size = UDim2.new(1, -8, 1, -36)
         holder.Position = UDim2.new(0, 4, 0, 32)
         holder.BackgroundTransparency = 1
+        holder.Parent = colFrame
 
         local list = Instance.new("UIListLayout", holder)
         list.FillDirection = Enum.FillDirection.Vertical
@@ -116,10 +116,9 @@ function Gui.Init(ModuleManager)
             btn.Text = "  " .. mod.Name
             btn.Parent = holder
 
-            local btnCorner = Instance.new("UICorner", btn)
-            btnCorner.CornerRadius = UDim.new(0, 6)
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
 
-            local rightDots = Instance.new("TextLabel", btn)
+            local rightDots = Instance.new("TextLabel")
             rightDots.Size = UDim2.new(0, 20, 1, 0)
             rightDots.Position = UDim2.new(1, -22, 0, 0)
             rightDots.BackgroundTransparency = 1
@@ -127,6 +126,7 @@ function Gui.Init(ModuleManager)
             rightDots.Text = "···"
             rightDots.TextColor3 = Color3.fromRGB(120, 120, 140)
             rightDots.TextSize = 14
+            rightDots.Parent = btn
 
             local function updateColor()
                 if mod.Enabled then
@@ -159,18 +159,17 @@ function Gui.Init(ModuleManager)
     end
 
     ---------------------------------------------------
-    -- Сортировка категорий (Combat, Movement, Visuals, Player, Misc, остальные)
+    -- Порядок категорий
     ---------------------------------------------------
-    local order = {"Combat", "Movement", "Visuals", "Player", "Misc"}
+    local preferredOrder = {"Combat", "Movement", "Visuals", "Player", "Misc"}
     local categoryNames = {}
-
     for name, _ in pairs(ModuleManager.Categories) do
         table.insert(categoryNames, name)
     end
 
     table.sort(categoryNames, function(a, b)
         local ia, ib
-        for i, v in ipairs(order) do
+        for i, v in ipairs(preferredOrder) do
             if v == a then ia = i end
             if v == b then ib = i end
         end
@@ -190,22 +189,22 @@ function Gui.Init(ModuleManager)
     end
 
     ---------------------------------------------------
-    -- Поиск (снизу, по всем модулям)
+    -- Поиск (снизу)
     ---------------------------------------------------
-    local searchFrame = Instance.new("Frame", overlay)
+    local searchFrame = Instance.new("Frame")
     searchFrame.Size = UDim2.new(0, 300, 0, 32)
     searchFrame.Position = UDim2.new(0.5, -150, 0.5, 240)
     searchFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
     searchFrame.BorderSizePixel = 0
+    searchFrame.Parent = overlay
 
-    local searchCorner = Instance.new("UICorner", searchFrame)
-    searchCorner.CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", searchFrame).CornerRadius = UDim.new(0, 8)
 
     local searchStroke = Instance.new("UIStroke", searchFrame)
     searchStroke.Color = Color3.fromRGB(60, 60, 80)
     searchStroke.Thickness = 1
 
-    local searchBox = Instance.new("TextBox", searchFrame)
+    local searchBox = Instance.new("TextBox")
     searchBox.Size = UDim2.new(1, -16, 1, 0)
     searchBox.Position = UDim2.new(0, 8, 0, 0)
     searchBox.BackgroundTransparency = 1
@@ -217,6 +216,7 @@ function Gui.Init(ModuleManager)
     searchBox.TextSize = 14
     searchBox.TextXAlignment = Enum.TextXAlignment.Left
     searchBox.ClearTextOnFocus = false
+    searchBox.Parent = searchFrame
 
     local function applySearch()
         local q = searchBox.Text:lower()
@@ -230,7 +230,7 @@ function Gui.Init(ModuleManager)
     searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
 
     ---------------------------------------------------
-    -- Тоггл RightShift
+    -- Тоггл по RightShift
     ---------------------------------------------------
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
