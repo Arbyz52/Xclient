@@ -9,6 +9,11 @@
       "path": "modules/Combat/KillAura.lua",
       "category": "Combat",
       "name": "KillAura"
+    },
+    {
+      "path": "modules/Visuals/ESP.lua",
+      "category": "Visuals",
+      "name": "ESP"
     }
   ]
 }
