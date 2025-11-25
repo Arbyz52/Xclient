@@ -11,7 +11,7 @@
       "name": "ESP"
     },
     {
-      "path": "modules/Visuals/Fly.lua",
+      "path": "modules/Movement/Fly.lua",
       "category": "Visuals",
       "name": "Fly"
     }
