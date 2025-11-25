@@ -1,5 +1,5 @@
--- ===================== main.lua (GitHub + manifest + Reload) ======================
--- Запуск из игры:
+-- ===================== main.lua (GitHub + manifest + raw scripts) ======================
+-- Запуск:
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/Arbyz52/Xclient/main/main.lua"))()
 
 local GITHUB_USER   = "Arbyz52"
@@ -128,7 +128,7 @@ function ModuleManager:Tick(dt)
 end
 
 ----------------------------------------------------------------
--- Перезагрузка модулей из manifest.json
+-- ReloadFromManifest: поддержка обычных модулей и raw-скриптов
 ----------------------------------------------------------------
 function ModuleManager:ReloadFromManifest()
     print("[Xclient] Загружаю manifest.json...")
@@ -165,28 +165,61 @@ function ModuleManager:ReloadFromManifest()
             local path     = entry.path
             local category = entry.category or "Misc"
             local name     = entry.name     or path
+            local mtype    = (entry.type or entry.kind or "module"):lower() -- "module" или "raw"
 
             local url = RAW_BASE .. path
 
             local codeOK, code = pcall(httpGet, url)
             if not codeOK then
-                warn("[Xclient] Не удалось скачать модуль", path, ":", code)
+                warn("[Xclient] Не удалось скачать", path, ":", code)
             else
-                local chunk, lerr = loadstring(code, "@" .. path)
-                if not chunk then
-                    warn("[Xclient] Ошибка loadstring в модуле", path, ":", lerr)
-                else
-                    local ok2, mod = pcall(chunk)
-                    if not ok2 then
-                        warn("[Xclient] Ошибка при выполнении модуля", path, ":", mod)
-                    elseif type(mod) == "table" then
-                        mod.Category = category
-                        mod.Name     = name
-                        self:RegisterModule(mod)
-                        count += 1
-                        print("[Xclient] Модуль загружен:", category .. "/" .. name)
+                if mtype == "raw" then
+                    -- RAW-СКРИПТ: просто выполнить при включении
+                    local chunk, lerr = loadstring(code, "@" .. path)
+                    if not chunk then
+                        warn("[Xclient] loadstring error (raw)", path, ":", lerr)
                     else
-                        warn("[Xclient] Модуль", path, "не вернул таблицу")
+                        local wrapper = {
+                            Name     = name,
+                            Category = category,
+                            Enabled  = false,
+                            _chunk   = chunk,
+                        }
+
+                        function wrapper:OnEnable()
+                            print("[Xclient][RAW]", self.Name, "ON")
+                            local ok2, err2 = pcall(self._chunk)
+                            if not ok2 then
+                                warn("[Xclient][RAW]", self.Name, "error:", err2)
+                            end
+                        end
+
+                        function wrapper:OnDisable()
+                            print("[Xclient][RAW]", self.Name, "OFF (ничего не делаем)")
+                        end
+
+                        self:RegisterModule(wrapper)
+                        count += 1
+                        print("[Xclient] RAW-скрипт загружен:", category .. "/" .. name)
+                    end
+                else
+                    -- Обычный модуль: ждём таблицу
+                    local chunk, lerr = loadstring(code, "@" .. path)
+                    if not chunk then
+                        warn("[Xclient] loadstring error (module)", path, ":", lerr)
+                    else
+                        local ok2, mod = pcall(chunk)
+                        if not ok2 then
+                            warn("[Xclient] runtime error (module)", path, ":", mod)
+                        elseif type(mod) == "table" then
+                            mod.Category = category
+                            mod.Name     = name
+                            self:RegisterModule(mod)
+                            count += 1
+                            print("[Xclient] Модуль загружен:", category .. "/" .. name)
+                        else
+                            warn("[Xclient] Модуль", path, "не вернул таблицу")
+                        end
                     end
                 end
             end
@@ -203,7 +236,7 @@ end
 ModuleManager:ReloadFromManifest()
 
 ----------------------------------------------------------------
--- ЗАГРУЗКА GUI С GITHUB
+-- ЗАГРУЗКА GUI
 ----------------------------------------------------------------
 local function initGUI()
     local code = httpGet(GUI_URL)
