@@ -1,4 +1,4 @@
--- ===================== main.lua (GitHub + manifest) ======================
+-- ===================== main.lua (GitHub + manifest + Reload) ======================
 -- Запуск из игры:
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/Arbyz52/Xclient/main/main.lua"))()
 
@@ -18,7 +18,7 @@ local HttpService = game:GetService("HttpService")
 local RunService  = game:GetService("RunService")
 
 ----------------------------------------------------------------
--- HTTP GET (без лишних заголовков)
+-- HTTP GET
 ----------------------------------------------------------------
 local function httpGet(url)
     -- 1) Roblox HttpGet
@@ -128,10 +128,20 @@ function ModuleManager:Tick(dt)
 end
 
 ----------------------------------------------------------------
--- ЗАГРУЗКА МОДУЛЕЙ ИЗ manifest.json
+-- Перезагрузка модулей из manifest.json
 ----------------------------------------------------------------
-local function loadModulesFromManifest()
+function ModuleManager:ReloadFromManifest()
     print("[Xclient] Загружаю manifest.json...")
+
+    -- выключаем старые
+    for _, mod in ipairs(self.Modules) do
+        if mod.Enabled and type(mod.OnDisable) == "function" then
+            pcall(function() mod:OnDisable() end)
+        end
+    end
+
+    self.Modules    = {}
+    self.Categories = {}
 
     local manifest
     local ok, err = pcall(function()
@@ -140,12 +150,12 @@ local function loadModulesFromManifest()
 
     if not ok then
         warn("[Xclient] Не удалось загрузить manifest.json:", err)
-        return
+        return false
     end
 
     if type(manifest) ~= "table" or type(manifest.modules) ~= "table" then
         warn("[Xclient] Неверный формат manifest.json")
-        return
+        return false
     end
 
     local count = 0
@@ -170,10 +180,9 @@ local function loadModulesFromManifest()
                     if not ok2 then
                         warn("[Xclient] Ошибка при выполнении модуля", path, ":", mod)
                     elseif type(mod) == "table" then
-                        -- приоритет за manifest.json
                         mod.Category = category
                         mod.Name     = name
-                        ModuleManager:RegisterModule(mod)
+                        self:RegisterModule(mod)
                         count += 1
                         print("[Xclient] Модуль загружен:", category .. "/" .. name)
                     else
@@ -185,7 +194,13 @@ local function loadModulesFromManifest()
     end
 
     print("[Xclient] Загрузка модулей завершена, всего:", count)
+    return true
 end
+
+----------------------------------------------------------------
+-- ПЕРВАЯ ЗАГРУЗКА МОДУЛЕЙ
+----------------------------------------------------------------
+ModuleManager:ReloadFromManifest()
 
 ----------------------------------------------------------------
 -- ЗАГРУЗКА GUI С GITHUB
@@ -211,12 +226,11 @@ local function initGUI()
     end
 end
 
-----------------------------------------------------------------
--- СТАРТ
-----------------------------------------------------------------
-loadModulesFromManifest()
 initGUI()
 
+----------------------------------------------------------------
+-- ТИК
+----------------------------------------------------------------
 RunService.RenderStepped:Connect(function(dt)
     ModuleManager:Tick(dt)
 end)
