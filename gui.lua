@@ -1,4 +1,4 @@
--- ===================== gui.lua (Xclient) ======================
+-- ===================== gui.lua (Xclient, без биндов) ======================
 
 local Gui = {}
 
@@ -39,15 +39,6 @@ function Gui.Init(ModuleManager)
     screenGui.Parent = parent
 
     ---------------------------------------------------
-    -- Данные для биндов и кнопок
-    ---------------------------------------------------
-    local ModuleBinds   = {} -- [mod] = Enum.KeyCode
-    local ButtonByMod   = {} -- [mod] = info
-    local InfoByButton  = {} -- [TextButton] = info
-    local bindingMod    = nil
-    local hoveredButton = nil
-
-    ---------------------------------------------------
     -- Контейнер для колонок
     ---------------------------------------------------
     local mainFrame = Instance.new("Frame")
@@ -62,7 +53,7 @@ function Gui.Init(ModuleManager)
     layout.FillDirection = Enum.FillDirection.Horizontal
     layout.Padding = UDim.new(0, 26)
 
-    local allButtons = {} -- список info
+    local allButtons = {} -- для поиска
 
     ---------------------------------------------------
     -- Твин цвета
@@ -154,33 +145,20 @@ function Gui.Init(ModuleManager)
             stateDot.Parent = btn
             Instance.new("UICorner", stateDot).CornerRadius = UDim.new(1, 0)
 
-            -- правый лейбл: "..." (нет бинда) или имя клавиши
-            local bindLabel = Instance.new("TextLabel")
-            bindLabel.Size = UDim2.new(0, 40, 1, 0)
-            bindLabel.Position = UDim2.new(1, -30, 0, 0)
-            bindLabel.BackgroundTransparency = 1
-            bindLabel.Font = Enum.Font.GothamBold
-            bindLabel.TextColor3 = Color3.fromRGB(160, 160, 195)
-            bindLabel.TextSize = 13
-            bindLabel.TextXAlignment = Enum.TextXAlignment.Right
-            bindLabel.Text = "..."
-            bindLabel.Parent = btn
-
             local info = {
-                button    = btn,
-                mod       = mod,
-                bindLabel = bindLabel,
-                stateDot  = stateDot,
+                button = btn,
+                mod    = mod,
+                dot    = stateDot,
             }
 
             local function updateColors()
                 if mod.Enabled then
                     tweenColor(btn, Color3.fromRGB(95, 155, 245))
-                    btn.TextColor3            = Color3.fromRGB(255, 255, 255)
+                    btn.TextColor3       = Color3.fromRGB(255, 255, 255)
                     stateDot.BackgroundColor3 = Color3.fromRGB(170, 215, 255)
                 else
                     tweenColor(btn, Color3.fromRGB(30, 30, 56))
-                    btn.TextColor3            = Color3.fromRGB(215, 215, 232)
+                    btn.TextColor3       = Color3.fromRGB(215, 215, 232)
                     stateDot.BackgroundColor3 = Color3.fromRGB(110, 110, 155)
                 end
             end
@@ -188,20 +166,15 @@ function Gui.Init(ModuleManager)
             updateColors()
 
             btn.MouseEnter:Connect(function()
-                hoveredButton = btn
                 if not mod.Enabled then
                     tweenColor(btn, Color3.fromRGB(42, 42, 74))
                 end
             end)
 
             btn.MouseLeave:Connect(function()
-                if hoveredButton == btn then
-                    hoveredButton = nil
-                end
                 updateColors()
             end)
 
-            -- ЛКМ: вкл/выкл + звук
             btn.MouseButton1Click:Connect(function()
                 ModuleManager:SetEnabled(mod, not mod.Enabled)
                 updateColors()
@@ -209,8 +182,6 @@ function Gui.Init(ModuleManager)
             end)
 
             table.insert(allButtons, info)
-            ButtonByMod[mod]  = info
-            InfoByButton[btn] = info
         end
     end
 
@@ -307,6 +278,8 @@ function Gui.Init(ModuleManager)
         TweenService:Create(searchFrame, info, {Position = UDim2.new(0.5, -160, 0.5, 240)}):Play()
     end
 
+    privateMenuOpen = menuOpen
+
     local function playCloseAnim()
         local info = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
         local t1 = TweenService:Create(mainFrame,  info, {Position = UDim2.new(0.5, -550, 0.5, -260)})
@@ -333,77 +306,21 @@ function Gui.Init(ModuleManager)
     end
 
     ---------------------------------------------------
-    -- Ввод / бинды
+    -- Управление (только RightShift + поиск)
     ---------------------------------------------------
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
 
         local focused = UserInputService:GetFocusedTextBox()
-
-        -- если ждём клавишу для бинда
-        if bindingMod and input.UserInputType == Enum.UserInputType.Keyboard then
-            local key = input.KeyCode
-            local info = ButtonByMod[bindingMod]
-
-            if key == Enum.KeyCode.Escape then
-                ModuleBinds[bindingMod] = nil
-                if info and info.bindLabel then
-                    info.bindLabel.Text = "..."
-                    info.bindLabel.TextColor3 = Color3.fromRGB(160, 160, 195)
-                end
-            else
-                ModuleBinds[bindingMod] = key
-                if info and info.bindLabel then
-                    local name = tostring(key):gsub("Enum.KeyCode.", "")
-                    info.bindLabel.Text = name
-                    info.bindLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
-                end
-            end
-
-            bindingMod = nil
-            return
-        end
-
-        -- если печатаем в поиск и бинд не ждём — игнор
         if focused and focused == searchBox then
+            -- когда вводим текст в поиск, ничего больше не делаем
             return
         end
 
-        -- колесико мыши -> старт бинда (по hoveredButton)
-        if input.UserInputType == Enum.UserInputType.MouseButton3 then
-            if hoveredButton then
-                local info = InfoByButton[hoveredButton]
-                if info then
-                    bindingMod = info.mod
-                    if info.bindLabel then
-                        info.bindLabel.Text = "..."
-                        info.bindLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
-                    end
-                end
-            end
-            return
-        end
-
-        -- RightShift -> открыть/закрыть меню
         if input.UserInputType == Enum.UserInputType.Keyboard
-            and input.KeyCode == Enum.KeyCode.RightShift then
+           and input.KeyCode == Enum.KeyCode.RightShift then
             setMenuOpen(not menuOpen)
             return
-        end
-
-        -- обработка биндов
-        if input.UserInputType == Enum.UserInputType.Keyboard then
-            local key = input.KeyCode
-            for mod, bindKey in pairs(ModuleBinds) do
-                if bindKey == key then
-                    ModuleManager:SetEnabled(mod, not mod.Enabled)
-                    local info = ButtonByMod[mod]
-                    if info and info.updateColors then
-                        info.updateColors()
-                    end
-                    playToggle()
-                end
-            end
         end
     end)
 
