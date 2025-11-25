@@ -1,7 +1,7 @@
 local module = {
     Name     = "ESP",
     Category = "Visuals",
-    Enabled  = false,
+    Enabled  = true,
 }
 
 local Players = game:GetService("Players")
