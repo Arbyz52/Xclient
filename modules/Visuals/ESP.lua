@@ -1,208 +1,135 @@
-local Players    = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local CoreGui    = game:GetService("CoreGui")
-local Workspace  = game:GetService("Workspace")
-
-local LocalPlayer = Players.LocalPlayer
-local Camera      = Workspace.CurrentCamera
-
 local module = {
     Name     = "ESP",
     Category = "Visuals",
-    Enabled  = false,
+    Enabled  = true,
 }
 
-local Settings = {
-    BoxColor       = Color3.fromRGB(255, 0, 0),
-    NameColor      = Color3.fromRGB(255, 255, 255),
-    MaxDistance    = 1000,
-    TeamCheck      = true,
-    ShowBox        = true,
-    ShowName       = true,
-    ShowHealth     = true,
-    ShowDistance   = true,
-}
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
+local CoreGui = game:GetService("CoreGui")
 
-module._gui         = nil        -- ScreenGui
-module._container   = nil        -- Folder под все ESP объекты
-module._espObjects  = {}         -- [player] = {...}
-module._connections = {}         -- список коннектов
+module._gui = nil
+module._connection = nil
+module._frameCount = 0
+module._lastUpdate = 0
 
 function module:Init()
-    print("[Xclient][ESP] Init()")
+    print("[Xclient][FPS Monitor] Init()")
 end
 
----------------------------------------------------------------------
--- Вспомогательные
----------------------------------------------------------------------
-local function hideAll(esp)
-    for _, obj in pairs(esp) do
-        if typeof(obj) == "Instance" and obj:IsA("GuiObject") then
-            obj.Visible = false
-        end
+function module:OnEnable()
+    print("[Xclient][FPS Monitor] Включен")
+    
+    if self._gui then
+        self._gui.Enabled = true
+        return
     end
-end
-
----------------------------------------------------------------------
--- Создание ESP элементов для игрока
----------------------------------------------------------------------
-function module:CreateESP(player)
-    if player == LocalPlayer then return end
-
-    -- защита от дубликатов
-    self:RemoveESP(player)
-
-    if not self._container then return end
-
-    local espHolder = Instance.new("Folder")
-    espHolder.Name = player.Name .. "_ESP"
-    espHolder.Parent = self._container
-
-    -- Бокс
-    local box = Instance.new("Frame")
-    box.Name = "Box"
-    box.BackgroundTransparency = 1
-    box.BorderSizePixel = 0
-    box.Visible = false
-
-    local boxStroke = Instance.new("UIStroke")
-    boxStroke.Color = Settings.BoxColor
-    boxStroke.Thickness = 2
-    boxStroke.Parent = box
-
-    -- Имя
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Name = "Name"
-    nameLabel.Text = player.Name
-    nameLabel.TextColor3 = Settings.NameColor
-    nameLabel.TextStrokeTransparency = 0
-    nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Font = Enum.Font.SourceSansBold
-    nameLabel.TextSize = 14
-    nameLabel.Size = UDim2.new(0, 100, 0, 20)
-    nameLabel.Visible = false
-
-    -- Дистанция
-    local distanceLabel = Instance.new("TextLabel")
-    distanceLabel.Name = "Distance"
-    distanceLabel.TextColor3 = Settings.NameColor
-    distanceLabel.TextStrokeTransparency = 0
-    distanceLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-    distanceLabel.BackgroundTransparency = 1
-    distanceLabel.Font = Enum.Font.SourceSans
-    distanceLabel.TextSize = 12
-    distanceLabel.Size = UDim2.new(0, 100, 0, 20)
-    distanceLabel.Visible = false
-
-    -- Здоровье (полоска слева)
-    local healthBar = Instance.new("Frame")
-    healthBar.Name = "HealthBar"
-    healthBar.BackgroundColor3 = Color3.new(0, 0, 0)
-    healthBar.BorderSizePixel = 0
-    healthBar.Visible = false
-
-    local healthFill = Instance.new("Frame")
-    healthFill.Name = "Fill"
-    healthFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    healthFill.BorderSizePixel = 0
-    healthFill.Parent = healthBar
-
-    box.Parent          = espHolder
-    nameLabel.Parent    = espHolder
-    distanceLabel.Parent= espHolder
-    healthBar.Parent    = espHolder
-
-    self._espObjects[player] = {
-        Holder     = espHolder,
-        Box        = box,
-        Name       = nameLabel,
-        Distance   = distanceLabel,
-        HealthBar  = healthBar,
-        HealthFill = healthFill
-    }
-end
-
----------------------------------------------------------------------
--- Удаление ESP игрока
----------------------------------------------------------------------
-function module:RemoveESP(player)
-    local esp = self._espObjects[player]
-    if esp then
-        if esp.Holder and esp.Holder.Parent then
-            esp.Holder:Destroy()
-        else
-            for _, obj in pairs(esp) do
-                if typeof(obj) == "Instance" and obj.Parent then
-                    obj:Destroy()
-                end
+    
+    -- Создаем GUI
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "Xclient_FPSMonitor"
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 150, 0, 80)
+    frame.Position = UDim2.new(0, 10, 0, 10)
+    frame.BackgroundColor3 = Color3.new(0, 0, 0)
+    frame.BackgroundTransparency = 0.3
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+    
+    local fpsLabel = Instance.new("TextLabel")
+    fpsLabel.Name = "FPS"
+    fpsLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    fpsLabel.Position = UDim2.new(0, 0, 0, 0)
+    fpsLabel.BackgroundTransparency = 1
+    fpsLabel.Font = Enum.Font.SourceSansBold
+    fpsLabel.Text = "FPS: 0"
+    fpsLabel.TextColor3 = Color3.new(1, 1, 1)
+    fpsLabel.TextSize = 16
+    fpsLabel.Parent = frame
+    
+    local pingLabel = Instance.new("TextLabel")
+    pingLabel.Name = "Ping"
+    pingLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    pingLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    pingLabel.BackgroundTransparency = 1
+    pingLabel.Font = Enum.Font.SourceSansBold
+    pingLabel.Text = "Ping: 0ms"
+    pingLabel.TextColor3 = Color3.new(1, 1, 1)
+    pingLabel.TextSize = 16
+    pingLabel.Parent = frame
+    
+    local parent = CoreGui
+    pcall(function()
+        if gethui then parent = gethui() end
+    end)
+    screenGui.Parent = parent
+    
+    self._gui = screenGui
+    self._fpsLabel = fpsLabel
+    self._pingLabel = pingLabel
+    
+    -- Запускаем обновление
+    self._lastUpdate = tick()
+    self._frameCount = 0
+    
+    self._connection = RunService.RenderStepped:Connect(function()
+        self._frameCount = self._frameCount + 1
+        
+        local currentTime = tick()
+        if currentTime - self._lastUpdate >= 1 then
+            local fps = self._frameCount
+            self._frameCount = 0
+            self._lastUpdate = currentTime
+            
+            self._fpsLabel.Text = string.format("FPS: %d", fps)
+            
+            -- Цвет FPS в зависимости от значения
+            if fps >= 50 then
+                self._fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+            elseif fps >= 30 then
+                self._fpsLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+            else
+                self._fpsLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+            end
+            
+            -- Пинг
+            local ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+            self._pingLabel.Text = string.format("Ping: %dms", math.floor(ping))
+            
+            -- Цвет пинга
+            if ping <= 50 then
+                self._pingLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+            elseif ping <= 100 then
+                self._pingLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+            else
+                self._pingLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
             end
         end
-        self._espObjects[player] = nil
+    end)
+end
+
+function module:OnDisable()
+    print("[Xclient][FPS Monitor] Выключен")
+    
+    if self._gui then
+        self._gui.Enabled = false
+    end
+    
+    if self._connection then
+        self._connection:Disconnect()
+        self._connection = nil
     end
 end
 
----------------------------------------------------------------------
--- Обновление ESP для конкретного игрока (каждый кадр)
----------------------------------------------------------------------
-function module:UpdatePlayerESP(player)
-    local esp = self._espObjects[player]
-    if not esp then return end
+function module:OnTick(dt)
+    -- Не используется
+end
 
-    local character = player.Character
-    if not character then
-        hideAll(esp)
-        return
-    end
-
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not hrp or not humanoid or humanoid.Health <= 0 then
-        hideAll(esp)
-        return
-    end
-
-    -- TeamCheck
-    if Settings.TeamCheck and player.Team ~= nil and LocalPlayer.Team ~= nil
-        and player.Team == LocalPlayer.Team then
-        hideAll(esp)
-        return
-    end
-
-    -- расстояние
-    if not Camera then
-        Camera = Workspace.CurrentCamera
-        if not Camera then
-            hideAll(esp)
-            return
-        end
-    end
-
-    local distance = (hrp.Position - Camera.CFrame.Position).Magnitude
-    if distance > Settings.MaxDistance then
-        hideAll(esp)
-        return
-    end
-
-    -- 3D -> 2D
-    local rootPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-    if not onScreen then
-        hideAll(esp)
-        return
-    end
-
-    local head = character:FindFirstChild("Head")
-    local headPos = head and Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0)) or rootPos
-    local legPos  = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
-
-    local boxHeight = math.abs(headPos.Y - legPos.Y)
-    if boxHeight < 5 then
-        hideAll(esp)
-        return
-    end
-    local boxWidth = boxHeight * 0.5
-
-    -- Бокс
-    if Settings.ShowBox then
-        esp.Box.Size = UDim2.new(0, boxWidth, 0, boxHeight)
-        esp.Box.Position = UDim2.new(0, rootPos.X - boxWidth / 
+return module
