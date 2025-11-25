@@ -8,7 +8,7 @@ function Gui.Init(ModuleManager)
     local TweenService     = game:GetService("TweenService")
 
     ---------------------------------------------------
-    -- Экранный GUI
+    -- ScreenGui
     ---------------------------------------------------
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "XclientMenu"
@@ -22,10 +22,11 @@ function Gui.Init(ModuleManager)
     screenGui.Parent = parent
 
     ---------------------------------------------------
-    -- Данные для биндов
+    -- Данные для биндов и кнопок
     ---------------------------------------------------
     local ModuleBinds   = {} -- [mod] = Enum.KeyCode
     local ButtonByMod   = {} -- [mod] = info
+    local InfoByButton  = {} -- [button] = info
     local bindingMod    = nil
     local hoveredButton = nil
 
@@ -44,10 +45,10 @@ function Gui.Init(ModuleManager)
     layout.FillDirection = Enum.FillDirection.Horizontal
     layout.Padding = UDim.new(0, 24)
 
-    local allButtons = {} -- {button, mod, updateColors, bindLabel}
+    local allButtons = {} -- список info
 
     ---------------------------------------------------
-    -- Вспомогательная функция твина цвета
+    -- Твин цвета
     ---------------------------------------------------
     local function tweenColor(inst, targetColor)
         TweenService:Create(
@@ -133,7 +134,7 @@ function Gui.Init(ModuleManager)
             stateDot.Parent = btn
             Instance.new("UICorner", stateDot).CornerRadius = UDim.new(1, 0)
 
-            -- подпись бинда (справа, перед тройточиями)
+            -- подпись бинда
             local bindLabel = Instance.new("TextLabel")
             bindLabel.Size = UDim2.new(0, 40, 1, 0)
             bindLabel.Position = UDim2.new(1, -64, 0, 0)
@@ -156,17 +157,25 @@ function Gui.Init(ModuleManager)
             rightDots.TextSize = 14
             rightDots.Parent = btn
 
+            local info = {
+                button      = btn,
+                mod         = mod,
+                bindLabel   = bindLabel,
+                stateDot    = stateDot,
+            }
+
             local function updateColors()
                 if mod.Enabled then
-                    tweenColor(btn,       Color3.fromRGB(80, 140, 230))
+                    tweenColor(btn, Color3.fromRGB(80, 140, 230))
                     btn.TextColor3            = Color3.fromRGB(255, 255, 255)
                     stateDot.BackgroundColor3 = Color3.fromRGB(130, 200, 255)
                 else
-                    tweenColor(btn,       Color3.fromRGB(32, 32, 50))
+                    tweenColor(btn, Color3.fromRGB(32, 32, 50))
                     btn.TextColor3            = Color3.fromRGB(210, 210, 220)
                     stateDot.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
                 end
             end
+            info.updateColors = updateColors
             updateColors()
 
             btn.MouseEnter:Connect(function()
@@ -188,20 +197,14 @@ function Gui.Init(ModuleManager)
                 updateColors()
             end)
 
-            local info = {
-                button      = btn,
-                mod         = mod,
-                updateColors = updateColors,
-                bindLabel   = bindLabel,
-            }
             table.insert(allButtons, info)
-            ButtonByMod[mod] = info
-            btn.__bindInfo = info
+            ButtonByMod[mod]  = info
+            InfoByButton[btn] = info
         end
     end
 
     ---------------------------------------------------
-    -- Гарантируем 5 категорий (даже если нет модов)
+    -- Гарантируем 5 категорий
     ---------------------------------------------------
     local preferredOrder = {"Combat", "Movement", "Visuals", "Player", "Misc"}
     for _, cat in ipairs(preferredOrder) do
@@ -276,7 +279,7 @@ function Gui.Init(ModuleManager)
     searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
 
     ---------------------------------------------------
-    -- Анимация открытия/закрытия меню
+    -- Анимация открытия/закрытия
     ---------------------------------------------------
     local menuOpen = false
 
@@ -284,7 +287,7 @@ function Gui.Init(ModuleManager)
         screenGui.Enabled   = true
         searchFrame.Visible = true
 
-        mainFrame.Position  = UDim2.new(0.5, -550 - 80, 0.5, -230)
+        mainFrame.Position   = UDim2.new(0.5, -550 - 80, 0.5, -230)
         searchFrame.Position = UDim2.new(0.5, -160, 0.5, 260)
 
         local info = TweenInfo.new(0.23, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -318,31 +321,32 @@ function Gui.Init(ModuleManager)
     end
 
     ---------------------------------------------------
-    -- Бинды и управление клавишами / колесиком
+    -- Бинды и ввод
     ---------------------------------------------------
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
 
-        -- старт бинда по среднему клику, если курсор над кнопкой
+        -- колесико по функции -> ждём клавишу
         if input.UserInputType == Enum.UserInputType.MouseButton3 then
-            if hoveredButton and hoveredButton.__bindInfo then
-                local info = hoveredButton.__bindInfo
-                bindingMod = info.mod
-                if info.bindLabel then
-                    info.bindLabel.Text = "..."
-                    info.bindLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+            if hoveredButton then
+                local info = InfoByButton[hoveredButton]
+                if info then
+                    bindingMod = info.mod
+                    if info.bindLabel then
+                        info.bindLabel.Text = "..."
+                        info.bindLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+                    end
                 end
             end
             return
         end
 
-        -- если сейчас ждём клавишу для бинда
+        -- если ждём клавишу для бинда
         if bindingMod and input.UserInputType == Enum.UserInputType.Keyboard then
             local key = input.KeyCode
             local info = ButtonByMod[bindingMod]
 
             if key == Enum.KeyCode.Escape then
-                -- отмена бинда
                 ModuleBinds[bindingMod] = nil
                 if info and info.bindLabel then
                     info.bindLabel.Text = ""
@@ -361,8 +365,9 @@ function Gui.Init(ModuleManager)
             return
         end
 
-        -- открытие/закрытие меню RightShift
-        if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.RightShift then
+        -- RightShift -> открыть/закрыть меню
+        if input.UserInputType == Enum.UserInputType.Keyboard
+            and input.KeyCode == Enum.KeyCode.RightShift then
             setMenuOpen(not menuOpen)
             return
         end
