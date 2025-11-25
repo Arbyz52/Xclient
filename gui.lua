@@ -6,6 +6,7 @@ function Gui.Init(ModuleManager)
     local UserInputService = game:GetService("UserInputService")
     local CoreGui          = game:GetService("CoreGui")
     local Players          = game:GetService("Players")
+    local RunService       = game:GetService("RunService")
 
     local localPlayer = Players.LocalPlayer
 
@@ -120,7 +121,7 @@ function Gui.Init(ModuleManager)
 
             Instance.new("UICorner", stateDot).CornerRadius = UDim.new(1, 0)
 
-            -- три точки справа (как в примере)
+            -- три точки справа
             local rightDots = Instance.new("TextLabel")
             rightDots.Size = UDim2.new(0, 24, 1, 0)
             rightDots.Position = UDim2.new(1, -26, 0, 0)
@@ -133,12 +134,12 @@ function Gui.Init(ModuleManager)
 
             local function updateColors()
                 if mod.Enabled then
-                    btn.BackgroundColor3 = Color3.fromRGB(80, 140, 230)
-                    btn.TextColor3      = Color3.fromRGB(255, 255, 255)
+                    btn.BackgroundColor3       = Color3.fromRGB(80, 140, 230)
+                    btn.TextColor3            = Color3.fromRGB(255, 255, 255)
                     stateDot.BackgroundColor3 = Color3.fromRGB(130, 200, 255)
                 else
-                    btn.BackgroundColor3 = Color3.fromRGB(32, 32, 50)
-                    btn.TextColor3      = Color3.fromRGB(210, 210, 220)
+                    btn.BackgroundColor3       = Color3.fromRGB(32, 32, 50)
+                    btn.TextColor3            = Color3.fromRGB(210, 210, 220)
                     stateDot.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
                 end
             end
@@ -235,26 +236,42 @@ function Gui.Init(ModuleManager)
     searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
 
     ---------------------------------------------------
-    -- Курсор и открытие/закрытие RightShift
+    -- Курсор и RightShift
     ---------------------------------------------------
     local menuOpen = false
     local prevMouseBehavior = UserInputService.MouseBehavior
+    local prevMouseIcon     = UserInputService.MouseIconEnabled
+    local cursorConn        = nil
 
     local function setMenuOpen(state)
         if menuOpen == state then return end
         menuOpen = state
-        screenGui.Enabled = state
+        screenGui.Enabled   = state
         searchFrame.Visible = state
 
         if state then
             prevMouseBehavior = UserInputService.MouseBehavior
+            prevMouseIcon     = UserInputService.MouseIconEnabled
+
             UserInputService.MouseIconEnabled = true
-            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+            UserInputService.MouseBehavior    = Enum.MouseBehavior.Default
+
+            -- каждый кадр удерживаем мышь в Default,
+            -- чтобы игра не перехватывала её обратно
+            cursorConn = RunService.RenderStepped:Connect(function()
+                if UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default then
+                    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+                end
+            end)
         else
-            UserInputService.MouseIconEnabled = false
-            -- возвращаем поведение мыши как было
+            if cursorConn then
+                cursorConn:Disconnect()
+                cursorConn = nil
+            end
+
             pcall(function()
-                UserInputService.MouseBehavior = prevMouseBehavior
+                UserInputService.MouseBehavior    = prevMouseBehavior
+                UserInputService.MouseIconEnabled = prevMouseIcon
             end)
         end
     end
