@@ -26,7 +26,7 @@ function Gui.Init(ModuleManager)
     ---------------------------------------------------
     local ModuleBinds   = {} -- [mod] = Enum.KeyCode
     local ButtonByMod   = {} -- [mod] = info
-    local InfoByButton  = {} -- [button] = info
+    local InfoByButton  = {} -- [TextButton] = info
     local bindingMod    = nil
     local hoveredButton = nil
 
@@ -158,10 +158,10 @@ function Gui.Init(ModuleManager)
             rightDots.Parent = btn
 
             local info = {
-                button      = btn,
-                mod         = mod,
-                bindLabel   = bindLabel,
-                stateDot    = stateDot,
+                button    = btn,
+                mod       = mod,
+                bindLabel = bindLabel,
+                stateDot  = stateDot,
             }
 
             local function updateColors()
