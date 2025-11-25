@@ -11,23 +11,17 @@ function Gui.Init(ModuleManager)
     ---------------------------------------------------
     -- Звук переключения
     ---------------------------------------------------
-    local TOGGLE_SOUND_ID = "rbxassetid://87437544236708" -- можешь поменять на любой свой
+    local TOGGLE_SOUND_ID = "rbxassetid://87437544236708"
 
     local toggleSound = Instance.new("Sound")
     toggleSound.SoundId = TOGGLE_SOUND_ID
-    toggleSound.Volume = 0.4
+    toggleSound.Volume = 0.5
     toggleSound.Name = "XclientToggle"
     toggleSound.Parent = SoundService
 
     local function playToggle()
-        if not toggleSound.IsLoaded then
-            -- проигрываем один и тот же объект, перезапуская
-            toggleSound.TimePosition = 0
-            toggleSound:Play()
-        else
-            toggleSound.TimePosition = 0
-            toggleSound:Play()
-        end
+        toggleSound.TimePosition = 0
+        toggleSound:Play()
     end
 
     ---------------------------------------------------
@@ -49,8 +43,9 @@ function Gui.Init(ModuleManager)
     ---------------------------------------------------
     local ModuleBinds   = {} -- [mod] = Enum.KeyCode
     local ButtonByMod   = {} -- [mod] = info
-    local InfoByButton  = {} -- [button] = info
+    local InfoByButton  = {} -- [TextButton] = info
     local bindingMod    = nil
+    local hoveredButton = nil
 
     ---------------------------------------------------
     -- Контейнер для колонок
@@ -91,7 +86,7 @@ function Gui.Init(ModuleManager)
         local colFrame = Instance.new("Frame")
         colFrame.Name = categoryName
         colFrame.Size = UDim2.new(0, 215, 1, 0)
-        colFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
+        colFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 22)
         colFrame.BackgroundTransparency = 0.12
         colFrame.BorderSizePixel = 0
         colFrame.Parent = mainFrame
@@ -99,14 +94,13 @@ function Gui.Init(ModuleManager)
         Instance.new("UICorner", colFrame).CornerRadius = UDim.new(0, 14)
 
         local colStroke = Instance.new("UIStroke", colFrame)
-        colStroke.Color = Color3.fromRGB(80, 80, 120)
+        colStroke.Color = Color3.fromRGB(90, 90, 135)
         colStroke.Thickness = 1
 
-        -- заголовок
         local titleBar = Instance.new("Frame")
         titleBar.Size = UDim2.new(1, 0, 0, 34)
-        titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
-        titleBar.BackgroundTransparency = 0.1
+        titleBar.BackgroundColor3 = Color3.fromRGB(28, 28, 48)
+        titleBar.BackgroundTransparency = 0.05
         titleBar.BorderSizePixel = 0
         titleBar.Parent = colFrame
 
@@ -120,7 +114,7 @@ function Gui.Init(ModuleManager)
         title.Text = categoryName
         title.TextColor3 = Color3.fromRGB(245, 245, 255)
         title.TextSize = 18
-        title.TextXAlignment = Enum.TextXAlignment.Center  -- по центру
+        title.TextXAlignment = Enum.TextXAlignment.Center -- центр
         title.Parent = titleBar
 
         local holder = Instance.new("Frame")
@@ -138,13 +132,13 @@ function Gui.Init(ModuleManager)
             local btn = Instance.new("TextButton")
             btn.Name = mod.Name
             btn.Size = UDim2.new(1, 0, 0, 26)
-            btn.BackgroundColor3 = Color3.fromRGB(28, 28, 48)
+            btn.BackgroundColor3 = Color3.fromRGB(30, 30, 56)
             btn.BackgroundTransparency = 0.08
             btn.BorderSizePixel = 0
             btn.AutoButtonColor = false
             btn.Font = Enum.Font.Gotham
             btn.TextSize = 14
-            btn.TextColor3 = Color3.fromRGB(225, 225, 235)
+            btn.TextColor3 = Color3.fromRGB(225, 225, 238)
             btn.TextXAlignment = Enum.TextXAlignment.Left
             btn.Text = "      " .. mod.Name
             btn.Parent = holder
@@ -155,33 +149,22 @@ function Gui.Init(ModuleManager)
             local stateDot = Instance.new("Frame")
             stateDot.Size = UDim2.new(0, 8, 0, 8)
             stateDot.Position = UDim2.new(0, 8, 0.5, -4)
-            stateDot.BackgroundColor3 = Color3.fromRGB(100, 100, 140)
+            stateDot.BackgroundColor3 = Color3.fromRGB(110, 110, 155)
             stateDot.BorderSizePixel = 0
             stateDot.Parent = btn
             Instance.new("UICorner", stateDot).CornerRadius = UDim.new(1, 0)
 
-            -- подпись бинда
+            -- правый лейбл: или "..." (нет бинда), или имя клавиши
             local bindLabel = Instance.new("TextLabel")
-            bindLabel.Size = UDim2.new(0, 50, 1, 0)
-            bindLabel.Position = UDim2.new(1, -70, 0, 0)
+            bindLabel.Size = UDim2.new(0, 40, 1, 0)
+            bindLabel.Position = UDim2.new(1, -30, 0, 0)
             bindLabel.BackgroundTransparency = 1
-            bindLabel.Font = Enum.Font.Gotham
-            bindLabel.TextColor3 = Color3.fromRGB(170, 170, 200)
-            bindLabel.TextSize = 12
+            bindLabel.Font = Enum.Font.GothamBold
+            bindLabel.TextColor3 = Color3.fromRGB(160, 160, 195)
+            bindLabel.TextSize = 13
             bindLabel.TextXAlignment = Enum.TextXAlignment.Right
-            bindLabel.Text = ""
+            bindLabel.Text = "..."              -- по умолчанию тройточие
             bindLabel.Parent = btn
-
-            -- три точки справа
-            local rightDots = Instance.new("TextLabel")
-            rightDots.Size = UDim2.new(0, 24, 1, 0)
-            rightDots.Position = UDim2.new(1, -26, 0, 0)
-            rightDots.BackgroundTransparency = 1
-            rightDots.Font = Enum.Font.GothamBold
-            rightDots.Text = "···"
-            rightDots.TextColor3 = Color3.fromRGB(160, 160, 190)
-            rightDots.TextSize = 14
-            rightDots.Parent = btn
 
             local info = {
                 button    = btn,
@@ -192,45 +175,38 @@ function Gui.Init(ModuleManager)
 
             local function updateColors()
                 if mod.Enabled then
-                    tweenColor(btn, Color3.fromRGB(90, 150, 240))
+                    tweenColor(btn, Color3.fromRGB(95, 155, 245))
                     btn.TextColor3            = Color3.fromRGB(255, 255, 255)
-                    stateDot.BackgroundColor3 = Color3.fromRGB(160, 210, 255)
+                    stateDot.BackgroundColor3 = Color3.fromRGB(170, 215, 255)
                 else
-                    tweenColor(btn, Color3.fromRGB(28, 28, 48))
-                    btn.TextColor3            = Color3.fromRGB(210, 210, 225)
-                    stateDot.BackgroundColor3 = Color3.fromRGB(100, 100, 140)
+                    tweenColor(btn, Color3.fromRGB(30, 30, 56))
+                    btn.TextColor3            = Color3.fromRGB(215, 215, 232)
+                    stateDot.BackgroundColor3 = Color3.fromRGB(110, 110, 155)
                 end
             end
             info.updateColors = updateColors
             updateColors()
 
             btn.MouseEnter:Connect(function()
+                hoveredButton = btn
                 if not mod.Enabled then
-                    tweenColor(btn, Color3.fromRGB(40, 40, 72))
+                    tweenColor(btn, Color3.fromRGB(42, 42, 74))
                 end
             end)
 
             btn.MouseLeave:Connect(function()
+                if hoveredButton == btn then
+                    hoveredButton = nil
+                end
                 updateColors()
             end)
 
-            -- ЛКМ: вкл/выкл
+            -- ЛКМ: вкл/выкл + звук
             btn.MouseButton1Click:Connect(function()
                 ModuleManager:SetEnabled(mod, not mod.Enabled)
                 updateColors()
                 playToggle()
             end)
-
-            -- колесико по кнопке -> начало бинда
-            if btn.MouseButton3Click then
-                btn.MouseButton3Click:Connect(function()
-                    bindingMod = mod
-                    if bindLabel then
-                        bindLabel.Text = "..."
-                        bindLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
-                    end
-                end)
-            end
 
             table.insert(allButtons, info)
             ButtonByMod[mod]  = info
@@ -279,14 +255,14 @@ function Gui.Init(ModuleManager)
     searchFrame.Size = UDim2.new(0, 320, 0, 32)
     searchFrame.Position = UDim2.new(0.5, -160, 0.5, 240)
     searchFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 24)
-    searchFrame.BackgroundTransparency = 0.15
+    searchFrame.BackgroundTransparency = 0.18
     searchFrame.BorderSizePixel = 0
     searchFrame.Parent = screenGui
 
     Instance.new("UICorner", searchFrame).CornerRadius = UDim.new(0, 8)
 
     local searchStroke = Instance.new("UIStroke", searchFrame)
-    searchStroke.Color = Color3.fromRGB(80, 80, 120)
+    searchStroke.Color = Color3.fromRGB(80, 80, 130)
     searchStroke.Thickness = 1
 
     local searchBox = Instance.new("TextBox")
@@ -295,7 +271,7 @@ function Gui.Init(ModuleManager)
     searchBox.BackgroundTransparency = 1
     searchBox.Font = Enum.Font.Gotham
     searchBox.PlaceholderText = "Поиск"
-    searchBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 165)
+    searchBox.PlaceholderColor3 = Color3.fromRGB(135, 135, 170)
     searchBox.Text = ""
     searchBox.TextColor3 = Color3.fromRGB(230, 230, 245)
     searchBox.TextSize = 14
@@ -357,7 +333,7 @@ function Gui.Init(ModuleManager)
     end
 
     ---------------------------------------------------
-    -- Бинды и ввод
+    -- Ввод / бинды
     ---------------------------------------------------
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
@@ -372,15 +348,15 @@ function Gui.Init(ModuleManager)
             if key == Enum.KeyCode.Escape then
                 ModuleBinds[bindingMod] = nil
                 if info and info.bindLabel then
-                    info.bindLabel.Text = ""
-                    info.bindLabel.TextColor3 = Color3.fromRGB(170, 170, 200)
+                    info.bindLabel.Text = "..."
+                    info.bindLabel.TextColor3 = Color3.fromRGB(160, 160, 195)
                 end
             else
                 ModuleBinds[bindingMod] = key
                 if info and info.bindLabel then
                     local name = tostring(key):gsub("Enum.KeyCode.", "")
                     info.bindLabel.Text = name
-                    info.bindLabel.TextColor3 = Color3.fromRGB(170, 170, 200)
+                    info.bindLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
                 end
             end
 
@@ -388,8 +364,23 @@ function Gui.Init(ModuleManager)
             return
         end
 
-        -- если печатаем в поиск и бинда не ждём — не реагируем
+        -- если печатаем в поиск и бинд не ждём — игнор
         if focused and focused == searchBox then
+            return
+        end
+
+        -- колесико мыши -> старт бинда (по hoveredButton)
+        if input.UserInputType == Enum.UserInputType.MouseButton3 then
+            if hoveredButton then
+                local info = InfoByButton[hoveredButton]
+                if info then
+                    bindingMod = info.mod
+                    if info.bindLabel then
+                        info.bindLabel.Text = "..."
+                        info.bindLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+                    end
+                end
+            end
             return
         end
 
@@ -400,7 +391,7 @@ function Gui.Init(ModuleManager)
             return
         end
 
-        -- обработка биндов модулей
+        -- обработка биндов
         if input.UserInputType == Enum.UserInputType.Keyboard then
             local key = input.KeyCode
             for mod, bindKey in pairs(ModuleBinds) do
