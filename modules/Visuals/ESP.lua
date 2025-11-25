@@ -1,6 +1,11 @@
 -- Красим только пистолет из вид-модели (CurrentCamera).
 -- Без прицеливания: авто-поиск "оружейной" модели, руки игнорируем.
 -- F: вкл/выкл, Z/X: переключить кандидата, 1–9: цвет, N: Neon, T: сброс.
+local module = {
+    Name     = "ESP",
+    Category = "Visuals",
+    Enabled  = false,
+}
 
 local UserInputService = game:GetService("UserInputService")
 local camera = workspace.CurrentCamera
