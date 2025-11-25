@@ -7,11 +7,6 @@ local module = {
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
--- Горячие клавиши
-local KEY_TOGGLE = Enum.KeyCode.F
-local KEY_NEON   = Enum.KeyCode.N
-local KEY_RESET  = Enum.KeyCode.T
-
 -- Цвета 1–9
 local palette = {
     [Enum.KeyCode.One]   = Color3.fromRGB(255, 70, 70),
@@ -25,21 +20,20 @@ local palette = {
     [Enum.KeyCode.Nine]  = Color3.fromRGB(255, 255, 255),
 }
 
--- Состояние модуля
+-- Состояние
 module._tintColor = palette[Enum.KeyCode.Five]
-module._useNeon = true
-module._esp = {}          -- [player] = Highlight
+module._esp = {}
 module._connection = nil
 
--- Создать ESP для персонажа
-local function addESP(player, color, neon)
+-- Создать ESP для игрока
+local function addESP(player, color)
     if player == Players.LocalPlayer then return end
     if not player.Character then return end
     if module._esp[player] then return end
 
     local hl = Instance.new("Highlight")
     hl.Adornee = player.Character
-    hl.FillTransparency = 1
+    hl.FillTransparency = 0.7
     hl.OutlineColor = color
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     hl.Parent = player.Character
@@ -63,8 +57,8 @@ local function removeESP(player)
 end
 
 -- Перекрасить все ESP
-function module:RetintAll(color, neon)
-    for plr, hl in pairs(self._esp) do
+function module:RetintAll(color)
+    for _, hl in pairs(self._esp) do
         if hl and hl.Parent then
             hl.OutlineColor = color
         end
@@ -74,9 +68,7 @@ end
 -- Сбросить все ESP
 function module:ResetAll()
     for plr, hl in pairs(self._esp) do
-        if hl then
-            hl:Destroy()
-        end
+        if hl then hl:Destroy() end
     end
     self._esp = {}
 end
@@ -91,12 +83,12 @@ function module:OnEnable()
 
     -- Создать ESP для всех игроков
     for _, plr in ipairs(Players:GetPlayers()) do
-        addESP(plr, self._tintColor, self._useNeon)
+        addESP(plr, self._tintColor)
     end
 
     -- Новые игроки
     Players.PlayerAdded:Connect(function(plr)
-        addESP(plr, self._tintColor, self._useNeon)
+        addESP(plr, self._tintColor)
     end)
 
     -- Обработка клавиш
@@ -104,38 +96,17 @@ function module:OnEnable()
         if gp then return end
         if not self.Enabled then return end
 
-        if input.KeyCode == KEY_TOGGLE then
-            -- Вкл/выкл ESP
-            if next(self._esp) then
-                self:ResetAll()
-                print("[ESP] Off")
-            else
-                for _, plr in ipairs(Players:GetPlayers()) do
-                    addESP(plr, self._tintColor, self._useNeon)
-                end
-                print("[ESP] On")
-            end
-            return
-        end
-
-        if input.KeyCode == KEY_NEON then
-            self._useNeon = not self._useNeon
-            self:RetintAll(self._tintColor, self._useNeon)
-            print("[ESP] Neon:", self._useNeon)
-            return
-        end
-
-        if input.KeyCode == KEY_RESET then
-            self:ResetAll()
-            print("[ESP] Reset all")
-            return
-        end
-
         local newColor = palette[input.KeyCode]
         if newColor then
             self._tintColor = newColor
-            self:RetintAll(self._tintColor, self._useNeon)
+            self:RetintAll(newColor)
             print("[ESP] Color changed")
+            return
+        end
+
+        if input.KeyCode == Enum.KeyCode.T then
+            self:ResetAll()
+            print("[ESP] Reset all")
             return
         end
     end)
