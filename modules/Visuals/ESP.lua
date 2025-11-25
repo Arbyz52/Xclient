@@ -1,6 +1,6 @@
 local module = {
-    Name     = "Crosshair",
-    Category = "Interface",
+    Name     = "ESP",
+    Category = "Visuals",
     Enabled  = false,
 }
 
