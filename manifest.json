@@ -12,7 +12,7 @@
     },
     {
       "path": "modules/Movement/Fly.lua",
-      "category": "Visuals",
+      "category": "Movement",
       "name": "Fly"
     }
   ]
