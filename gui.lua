@@ -5,9 +5,10 @@ local Gui = {}
 function Gui.Init(ModuleManager)
     local UserInputService = game:GetService("UserInputService")
     local CoreGui          = game:GetService("CoreGui")
+    local TweenService     = game:GetService("TweenService")
 
     ---------------------------------------------------
-    -- ScreenGui
+    -- Экранный GUI
     ---------------------------------------------------
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "XclientMenu"
@@ -21,7 +22,15 @@ function Gui.Init(ModuleManager)
     screenGui.Parent = parent
 
     ---------------------------------------------------
-    -- Контейнер для колонок (без фона)
+    -- Данные для биндов
+    ---------------------------------------------------
+    local ModuleBinds   = {} -- [mod] = Enum.KeyCode
+    local ButtonByMod   = {} -- [mod] = info
+    local bindingMod    = nil
+    local hoveredButton = nil
+
+    ---------------------------------------------------
+    -- Контейнер для колонок
     ---------------------------------------------------
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "ColumnsHolder"
@@ -33,9 +42,20 @@ function Gui.Init(ModuleManager)
 
     local layout = Instance.new("UIListLayout", mainFrame)
     layout.FillDirection = Enum.FillDirection.Horizontal
-    layout.Padding = UDim.new(0, 24) -- отступ между колонками
+    layout.Padding = UDim.new(0, 24)
 
-    local allButtons = {} -- {button=..., mod=...}
+    local allButtons = {} -- {button, mod, updateColors, bindLabel}
+
+    ---------------------------------------------------
+    -- Вспомогательная функция твина цвета
+    ---------------------------------------------------
+    local function tweenColor(inst, targetColor)
+        TweenService:Create(
+            inst,
+            TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            { BackgroundColor3 = targetColor }
+        ):Play()
+    end
 
     ---------------------------------------------------
     -- Колонка категории
@@ -47,7 +67,7 @@ function Gui.Init(ModuleManager)
 
         local colFrame = Instance.new("Frame")
         colFrame.Name = categoryName
-        colFrame.Size = UDim2.new(0, 200, 1, 0) -- шире и выше
+        colFrame.Size = UDim2.new(0, 200, 1, 0)
         colFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 30)
         colFrame.BorderSizePixel = 0
         colFrame.Parent = mainFrame
@@ -64,8 +84,7 @@ function Gui.Init(ModuleManager)
         titleBar.BorderSizePixel = 0
         titleBar.Parent = colFrame
 
-        local tbCorner = Instance.new("UICorner", titleBar)
-        tbCorner.CornerRadius = UDim.new(0, 10)
+        Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 10)
 
         local title = Instance.new("TextLabel")
         title.Size = UDim2.new(1, -20, 1, 0)
@@ -100,7 +119,7 @@ function Gui.Init(ModuleManager)
             btn.TextSize = 14
             btn.TextColor3 = Color3.fromRGB(210, 210, 220)
             btn.TextXAlignment = Enum.TextXAlignment.Left
-            btn.Text = "      " .. mod.Name  -- отступ под точку слева
+            btn.Text = "      " .. mod.Name
             btn.Parent = holder
 
             Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
@@ -113,6 +132,18 @@ function Gui.Init(ModuleManager)
             stateDot.BorderSizePixel = 0
             stateDot.Parent = btn
             Instance.new("UICorner", stateDot).CornerRadius = UDim.new(1, 0)
+
+            -- подпись бинда (справа, перед тройточиями)
+            local bindLabel = Instance.new("TextLabel")
+            bindLabel.Size = UDim2.new(0, 40, 1, 0)
+            bindLabel.Position = UDim2.new(1, -64, 0, 0)
+            bindLabel.BackgroundTransparency = 1
+            bindLabel.Font = Enum.Font.Gotham
+            bindLabel.TextColor3 = Color3.fromRGB(160, 160, 180)
+            bindLabel.TextSize = 12
+            bindLabel.TextXAlignment = Enum.TextXAlignment.Right
+            bindLabel.Text = ""
+            bindLabel.Parent = btn
 
             -- три точки справа
             local rightDots = Instance.new("TextLabel")
@@ -127,11 +158,11 @@ function Gui.Init(ModuleManager)
 
             local function updateColors()
                 if mod.Enabled then
-                    btn.BackgroundColor3       = Color3.fromRGB(80, 140, 230)
+                    tweenColor(btn,       Color3.fromRGB(80, 140, 230))
                     btn.TextColor3            = Color3.fromRGB(255, 255, 255)
                     stateDot.BackgroundColor3 = Color3.fromRGB(130, 200, 255)
                 else
-                    btn.BackgroundColor3       = Color3.fromRGB(32, 32, 50)
+                    tweenColor(btn,       Color3.fromRGB(32, 32, 50))
                     btn.TextColor3            = Color3.fromRGB(210, 210, 220)
                     stateDot.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
                 end
@@ -139,12 +170,16 @@ function Gui.Init(ModuleManager)
             updateColors()
 
             btn.MouseEnter:Connect(function()
+                hoveredButton = btn
                 if not mod.Enabled then
-                    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 65)
+                    tweenColor(btn, Color3.fromRGB(40, 40, 65))
                 end
             end)
 
             btn.MouseLeave:Connect(function()
+                if hoveredButton == btn then
+                    hoveredButton = nil
+                end
                 updateColors()
             end)
 
@@ -153,14 +188,26 @@ function Gui.Init(ModuleManager)
                 updateColors()
             end)
 
-            table.insert(allButtons, {button = btn, mod = mod})
+            local info = {
+                button      = btn,
+                mod         = mod,
+                updateColors = updateColors,
+                bindLabel   = bindLabel,
+            }
+            table.insert(allButtons, info)
+            ButtonByMod[mod] = info
+            btn.__bindInfo = info
         end
     end
 
     ---------------------------------------------------
-    -- Порядок категорий
+    -- Гарантируем 5 категорий (даже если нет модов)
     ---------------------------------------------------
     local preferredOrder = {"Combat", "Movement", "Visuals", "Player", "Misc"}
+    for _, cat in ipairs(preferredOrder) do
+        ModuleManager.Categories[cat] = ModuleManager.Categories[cat] or {}
+    end
+
     local categoryNames = {}
     for name, _ in pairs(ModuleManager.Categories) do
         table.insert(categoryNames, name)
@@ -229,21 +276,109 @@ function Gui.Init(ModuleManager)
     searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
 
     ---------------------------------------------------
-    -- Открытие/закрытие (RightShift), курсор НЕ трогаем
+    -- Анимация открытия/закрытия меню
     ---------------------------------------------------
     local menuOpen = false
+
+    local function playOpenAnim()
+        screenGui.Enabled   = true
+        searchFrame.Visible = true
+
+        mainFrame.Position  = UDim2.new(0.5, -550 - 80, 0.5, -230)
+        searchFrame.Position = UDim2.new(0.5, -160, 0.5, 260)
+
+        local info = TweenInfo.new(0.23, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        TweenService:Create(mainFrame,  info, {Position = UDim2.new(0.5, -550, 0.5, -230)}):Play()
+        TweenService:Create(searchFrame, info, {Position = UDim2.new(0.5, -160, 0.5, 240)}):Play()
+    end
+
+    local function playCloseAnim()
+        local info = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        local t1 = TweenService:Create(mainFrame,  info, {Position = UDim2.new(0.5, -550 - 80, 0.5, -230)})
+        local t2 = TweenService:Create(searchFrame, info, {Position = UDim2.new(0.5, -160, 0.5, 260)})
+
+        t1:Play()
+        t2:Play()
+        t2.Completed:Connect(function()
+            if not menuOpen then
+                screenGui.Enabled   = false
+                searchFrame.Visible = false
+            end
+        end)
+    end
 
     local function setMenuOpen(state)
         if menuOpen == state then return end
         menuOpen = state
-        screenGui.Enabled   = state
-        searchFrame.Visible = state
+        if state then
+            playOpenAnim()
+        else
+            playCloseAnim()
+        end
     end
 
+    ---------------------------------------------------
+    -- Бинды и управление клавишами / колесиком
+    ---------------------------------------------------
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
-        if input.KeyCode == Enum.KeyCode.RightShift then
+
+        -- старт бинда по среднему клику, если курсор над кнопкой
+        if input.UserInputType == Enum.UserInputType.MouseButton3 then
+            if hoveredButton and hoveredButton.__bindInfo then
+                local info = hoveredButton.__bindInfo
+                bindingMod = info.mod
+                if info.bindLabel then
+                    info.bindLabel.Text = "..."
+                    info.bindLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+                end
+            end
+            return
+        end
+
+        -- если сейчас ждём клавишу для бинда
+        if bindingMod and input.UserInputType == Enum.UserInputType.Keyboard then
+            local key = input.KeyCode
+            local info = ButtonByMod[bindingMod]
+
+            if key == Enum.KeyCode.Escape then
+                -- отмена бинда
+                ModuleBinds[bindingMod] = nil
+                if info and info.bindLabel then
+                    info.bindLabel.Text = ""
+                    info.bindLabel.TextColor3 = Color3.fromRGB(160, 160, 180)
+                end
+            else
+                ModuleBinds[bindingMod] = key
+                if info and info.bindLabel then
+                    local name = tostring(key):gsub("Enum.KeyCode.", "")
+                    info.bindLabel.Text = name
+                    info.bindLabel.TextColor3 = Color3.fromRGB(160, 160, 180)
+                end
+            end
+
+            bindingMod = nil
+            return
+        end
+
+        -- открытие/закрытие меню RightShift
+        if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.RightShift then
             setMenuOpen(not menuOpen)
+            return
+        end
+
+        -- обработка биндов модулей
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            local key = input.KeyCode
+            for mod, bindKey in pairs(ModuleBinds) do
+                if bindKey == key then
+                    ModuleManager:SetEnabled(mod, not mod.Enabled)
+                    local info = ButtonByMod[mod]
+                    if info and info.updateColors then
+                        info.updateColors()
+                    end
+                end
+            end
         end
     end)
 
