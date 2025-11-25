@@ -1,25 +1,20 @@
-
 local module = {
     Name = "KillAura",
-    Category = "Combat", -- можно не писать, возьмётся из папки
+    Category = "Combat",
     Enabled = false,
 }
 
-function module:Init()
-    -- один раз при загрузке
-end
-
 function module:OnEnable()
-    -- включили
+    print("[Xclient] KillAura ON")
 end
 
 function module:OnDisable()
-    -- выключили
+    print("[Xclient] KillAura OFF")
 end
 
 function module:OnTick(dt)
     if not self.Enabled then return end
-    -- основной код твоей фичи
+    -- твой код
 end
 
 return module
