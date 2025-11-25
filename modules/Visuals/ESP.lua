@@ -3,24 +3,17 @@ local module = {
     Category = "Visuals",
     Enabled  = false,
 
-    -- [player] = {
-    --     highlight = Highlight,
-    --     humanoid  = Humanoid,
-    --     char      = Model,
-    --     origHealthDisplayType = Enum.HumanoidHealthDisplayType,
-    --     currentColor = Color3,
-    --     targetColor  = Color3,
-    -- }
-    _esp         = {},
-    _connections = {},
+    _data        = {},   -- [player] = {humanoid = ..., character = ..., highlight = ..., lastColor = Color3}
+    _connections = {},   -- ключ -> Connection
 }
 
 local Players     = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService  = game:GetService("RunService")
-local StarterGui  = game:GetService("StarterGui")
 
--- ================== Утилиты ==================
+--=========================
+-- УТИЛИТЫ
+--=========================
 
 local function disconnect(conn)
     if conn then
@@ -39,207 +32,204 @@ local function addConnection(key, conn)
     end
 end
 
-local function destroyEspData(data, restoreHealthDisplay)
-    if not data then return end
+local function disableDefaultHp(humanoid)
+    if not humanoid then return end
     pcall(function()
-        if restoreHealthDisplay and data.humanoid and data.origHealthDisplayType then
-            data.humanoid.HealthDisplayType = data.origHealthDisplayType
-        end
-        if data.highlight then
-            data.highlight:Destroy()
-        end
+        humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
     end)
 end
 
-local function removeESP(player, restoreHealthDisplay)
-    local data = module._esp[player]
-    if data then
-        destroyEspData(data, restoreHealthDisplay)
-        module._esp[player] = nil
-    end
+local function restoreDefaultHp(humanoid)
+    if not humanoid then return end
+    pcall(function()
+        humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.DisplayWhenDamaged
+    end)
+end
 
-    local key = "Char_" .. tostring(player.UserId)
-    if module._connections[key] then
-        disconnect(module._connections[key])
-        module._connections[key] = nil
+local function destroyPlayerData(player)
+    local info = module._data[player]
+    if not info then return end
+    if info.highlight then
+        pcall(function() info.highlight:Destroy() end)
+    end
+    module._data[player] = nil
+end
+
+-- цвет по хп: зелёный → жёлтый → красный
+local function getHealthColor(ratio)
+    ratio = math.clamp(ratio, 0, 1)
+
+    -- 1.0 -> зелёный (0,255,0)
+    -- 0.5 -> жёлтый (255,255,0)
+    -- 0.0 -> красный (255,0,0)
+
+    if ratio >= 0.5 then
+        -- от 0.5 до 1: жёлтый -> зелёный
+        local t = (ratio - 0.5) / 0.5  -- 0..1
+        local r = 255 * (1 - t)       -- 255 -> 0
+        local g = 255                 -- постоянный
+        local b = 0
+        return Color3.fromRGB(r, g, b)
+    else
+        -- от 0 до 0.5: красный -> жёлтый
+        local t = ratio / 0.5         -- 0..1
+        local r = 255
+        local g = 255 * t             -- 0 -> 255
+        local b = 0
+        return Color3.fromRGB(r, g, b)
     end
 end
 
--- ================== Цвет по ХП ==================
+--=========================
+-- НАСТРОЙКА ИГРОКА
+--=========================
 
-local function getColorForRatio(ratio)
-    -- ratio 0..1
-    -- 1  -> зелёный
-    -- 0  -> красный
-    local r = 255 * (1 - ratio)
-    local g = 255 * ratio
-    return Color3.fromRGB(r, g, 0)
-end
+local function setupCharacter(player, character)
+    if player == LocalPlayer then return end
+    if not character then return end
 
--- ================== Создание ESP для персонажа ==================
-
-local function createESPForCharacter(player, char, hum)
-    if player == LocalPlayer then
-        -- Себя не подсвечиваем, но можно скрыть стандартный HP бар, если нужно — отдельно
+    local hum = character:FindFirstChildOfClass("Humanoid")
+    if not hum then
+        -- дождёмся появления Humanoid
+        local key = "HumWait_" .. tostring(player.UserId)
+        addConnection(key, character.ChildAdded:Connect(function(child)
+            if child:IsA("Humanoid") then
+                disconnect(module._connections[key])
+                module._connections[key] = nil
+                setupCharacter(player, character)
+            end
+        end))
         return
     end
 
-    -- Сохраним и выключим стандартную полоску хп над головой
-    local origDisplayType = hum.HealthDisplayType
-    hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+    disableDefaultHp(hum)
 
-    -- Стартовый цвет по текущему хп
-    local ratio = 0
-    if hum.MaxHealth > 0 then
-        ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-    end
-    local startColor = getColorForRatio(ratio)
-
-    -- Highlight
+    -- создаём Highlight
     local hl = Instance.new("Highlight")
-    hl.Name = "ESP_HL"
-    hl.Adornee = char
-    hl.FillTransparency = 0.5
+    hl.Name = "ESP_Highlight"
+    hl.Adornee = character
+    hl.FillTransparency = 0.7
     hl.OutlineTransparency = 0
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.FillColor = startColor
-    hl.OutlineColor = startColor
-    hl.Parent = char
+    hl.Parent = character
 
-    module._esp[player] = {
-        highlight             = hl,
-        humanoid              = hum,
-        char                  = char,
-        origHealthDisplayType = origDisplayType,
-        currentColor          = startColor,
-        targetColor           = startColor,
+    -- начальный цвет по текущему хп
+    local maxHp = math.max(hum.MaxHealth, 1)
+    local ratio = hum.Health / maxHp
+    local col   = getHealthColor(ratio)
+    hl.OutlineColor = col
+    hl.FillColor    = col
+
+    module._data[player] = {
+        humanoid  = hum,
+        character = character,
+        highlight = hl,
+        lastColor = col,
     }
 end
 
-local function onCharacterAdded(player, char)
-    if player == LocalPlayer then
-        -- Свой персонаж тут можно дополнительно настраивать, если нужно
-        return
-    end
+local function onPlayerAdded(player)
+    if player ~= LocalPlayer then
+        if player.Character then
+            setupCharacter(player, player.Character)
+        end
 
-    -- убираем старый ESP, но НЕ возвращаем полоску ХП (модуль включён)
-    removeESP(player, false)
-
-    local hum
-    local ok = pcall(function()
-        hum = char:WaitForChild("Humanoid", 5)
-    end)
-
-    if not ok or not hum then
-        return
-    end
-
-    createESPForCharacter(player, char, hum)
-end
-
-local function watchPlayer(player)
-    if player == LocalPlayer then
-        return
-    end
-
-    local key = "Char_" .. tostring(player.UserId)
-    addConnection(key, player.CharacterAdded:Connect(function(char)
-        onCharacterAdded(player, char)
-    end))
-
-    -- Если персонаж уже есть — сразу обработаем
-    if player.Character then
-        onCharacterAdded(player, player.Character)
+        local key = "Respawn_" .. tostring(player.UserId)
+        addConnection(key, player.CharacterAdded:Connect(function(newChar)
+            destroyPlayerData(player)
+            setupCharacter(player, newChar)
+        end))
+    else
+        -- даже локальному выключим надпись хп, если хочешь без неё
+        if player.Character then
+            local hum = player.Character:FindFirstChildOfClass("Humanoid")
+            disableDefaultHp(hum)
+        end
+        local key = "LocalRespawn"
+        addConnection(key, player.CharacterAdded:Connect(function(newChar)
+            local hum = newChar:FindFirstChildOfClass("Humanoid")
+            disableDefaultHp(hum)
+        end))
     end
 end
 
--- ================== Обновление цвета (плавная анимация) ==================
+local function onPlayerRemoving(player)
+    destroyPlayerData(player)
+end
 
-local function updateAllColors(dt)
-    -- скорость сглаживания (чем больше, тем быстрее анимация)
-    local speed = 5  -- 5 = примерно 0.2 сек до нового цвета
-    local alpha = math.clamp(dt * speed, 0, 1)
+--=========================
+-- ОБНОВЛЕНИЕ ЦВЕТА (АНИМАЦИЯ)
+--=========================
 
-    for player, data in pairs(module._esp) do
-        local hum = data.humanoid
-        local hl  = data.highlight
+local LERP_SPEED = 10 -- скорость плавного перехода
 
-        if hum and hl and hum.MaxHealth > 0 then
+local function updateAll(dt)
+    for player, info in pairs(module._data) do
+        local hum = info.humanoid
+        local hl  = info.highlight
+        local char = info.character
+
+        if hum and hl and char and hum.MaxHealth > 0 then
             local ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-            local target = getColorForRatio(ratio)
+            local targetColor = getHealthColor(ratio)
 
-            data.targetColor = target
+            local current = info.lastColor or targetColor
+            local alpha   = math.clamp(LERP_SPEED * dt, 0, 1)
+            local newColor = current:Lerp(targetColor, alpha)
 
-            if not data.currentColor then
-                data.currentColor = target
-            else
-                data.currentColor = data.currentColor:Lerp(target, alpha)
-            end
-
-            hl.FillColor    = data.currentColor
-            hl.OutlineColor = data.currentColor
+            hl.OutlineColor = newColor
+            hl.FillColor    = newColor
+            info.lastColor  = newColor
         end
     end
 end
 
--- ================== Публичные методы ==================
+--=========================
+-- МЕТОДЫ МОДУЛЯ
+--=========================
 
 function module:Init()
-    if not self._esp then self._esp = {} end
+    if not self._data then self._data = {} end
     if not self._connections then self._connections = {} end
 end
 
 function module:OnEnable()
     self.Enabled = true
 
-    -- Убираем стандартный HP GUI (левый верхний угол) у тебя на клиенте
-    pcall(function()
-        StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
-    end)
-
-    -- Подключаемся к уже существующим игрокам
+    -- уже находящиеся игроки
     for _, plr in ipairs(Players:GetPlayers()) do
-        watchPlayer(plr)
+        onPlayerAdded(plr)
     end
 
-    -- Новые игроки
-    addConnection("PlayerAdded", Players.PlayerAdded:Connect(function(plr)
-        watchPlayer(plr)
-    end))
+    addConnection("PlayerAdded",   Players.PlayerAdded:Connect(onPlayerAdded))
+    addConnection("PlayerRemoving",Players.PlayerRemoving:Connect(onPlayerRemoving))
 
-    -- Удаление при выходе игрока
-    addConnection("PlayerRemoving", Players.PlayerRemoving:Connect(function(plr)
-        removeESP(plr, false)
+    addConnection("RenderUpdate", RunService.RenderStepped:Connect(function(dt)
+        updateAll(dt)
     end))
-
-    -- Плавное обновление цвета по хп
-    addConnection("Render", RunService.RenderStepped:Connect(updateAllColors))
 end
 
 function module:OnDisable()
     self.Enabled = false
 
-    -- Вернуть стандартный HP GUI
-    pcall(function()
-        StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, true)
-    end)
-
-    -- Снять ESP со всех и ВЕРНУТЬ полоски хп над головой
-    for plr, _ in pairs(self._esp) do
-        removeESP(plr, true)
-    end
-
-    -- Отключить все соединения
-    if type(self._connections) == "table" then
-        for key, conn in pairs(self._connections) do
-            disconnect(conn)
-            self._connections[key] = nil
+    -- вернуть стандартные hp‑надписи
+    for plr, info in pairs(self._data) do
+        if info.humanoid then
+            restoreDefaultHp(info.humanoid)
         end
+        if info.highlight then
+            pcall(function() info.highlight:Destroy() end)
+        end
+    end
+    self._data = {}
+
+    for key, conn in pairs(self._connections) do
+        disconnect(conn)
+        self._connections[key] = nil
     end
 end
 
 function module:OnTick(dt)
-    -- не используется
 end
 
 return module
