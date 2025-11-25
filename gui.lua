@@ -1,45 +1,15 @@
+
 -- ===================== gui.lua (Xclient) ======================
 
 local Gui = {}
 
--- ====== ГЛОБАЛЬНЫЕ ФЛАГИ ДЛЯ ХУКА ======
-local UIS = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
-local Players = game:GetService("Players")
-
-getgenv()._xclientMenuOpen         = getgenv()._xclientMenuOpen         or false
-getgenv()._xclientAllowMouseWrite  = getgenv()._xclientAllowMouseWrite  or false
-
--- ====== ХУК НА ИЗМЕНЕНИЕ MouseBehavior / MouseIconEnabled ======
-if not getgenv()._xclientHookedMouse then
-    getgenv()._xclientHookedMouse = true
-
-    local oldNewIndex
-
-    local function hookBody(self, key, value)
-        if self == UIS and (key == "MouseBehavior" or key == "MouseIconEnabled") then
-            if getgenv()._xclientMenuOpen and not getgenv()._xclientAllowMouseWrite then
-                -- блокируем изменения от игры, пока меню открыто
-                return
-            end
-        end
-        return oldNewIndex(self, key, value)
-    end
-
-    if hookmetamethod then
-        oldNewIndex = hookmetamethod(game, "__newindex", newcclosure(hookBody))
-    else
-        local mt = getrawmetatable(game)
-        oldNewIndex = mt.__newindex
-        setreadonly(mt, false)
-        mt.__newindex = newcclosure(hookBody)
-        setreadonly(mt, true)
-    end
-end
-
--- ====== ОСНОВНОЙ GUI ======
 function Gui.Init(ModuleManager)
-    local RunService = game:GetService("RunService")
+    local UserInputService = game:GetService("UserInputService")
+    local CoreGui          = game:GetService("CoreGui")
+    local Players          = game:GetService("Players")
+    local RunService       = game:GetService("RunService")
+    local Workspace        = game:GetService("Workspace")
+
     local localPlayer = Players.LocalPlayer
 
     ---------------------------------------------------
@@ -69,7 +39,7 @@ function Gui.Init(ModuleManager)
 
     local layout = Instance.new("UIListLayout", mainFrame)
     layout.FillDirection = Enum.FillDirection.Horizontal
-    layout.Padding = UDim.new(0, 24) -- отступы между колонками
+    layout.Padding = UDim.new(0, 24) -- побольше отступ между колонками
 
     local allButtons = {} -- {button=..., mod=...}
 
@@ -88,7 +58,8 @@ function Gui.Init(ModuleManager)
         colFrame.BorderSizePixel = 0
         colFrame.Parent = mainFrame
 
-        Instance.new("UICorner", colFrame).CornerRadius = UDim.new(0, 10)
+        local colCorner = Instance.new("UICorner", colFrame)
+        colCorner.CornerRadius = UDim.new(0, 10)
 
         local colStroke = Instance.new("UIStroke", colFrame)
         colStroke.Color = Color3.fromRGB(60, 60, 90)
@@ -139,7 +110,8 @@ function Gui.Init(ModuleManager)
             btn.Text = "      " .. mod.Name -- отступ под точку слева
             btn.Parent = holder
 
-            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+            local btnCorner = Instance.new("UICorner", btn)
+            btnCorner.CornerRadius = UDim.new(0, 8)
 
             -- индикатор состояния (точка слева)
             local stateDot = Instance.new("Frame")
@@ -148,6 +120,7 @@ function Gui.Init(ModuleManager)
             stateDot.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
             stateDot.BorderSizePixel = 0
             stateDot.Parent = btn
+
             Instance.new("UICorner", stateDot).CornerRadius = UDim.new(1, 0)
 
             -- три точки справа
@@ -265,35 +238,51 @@ function Gui.Init(ModuleManager)
     searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
 
     ---------------------------------------------------
-    -- Тоггл меню и управление мышью
+    -- Курсор + камера, RightShift
     ---------------------------------------------------
     local menuOpen = false
-    local prevMouseBehavior = UIS.MouseBehavior
-    local prevMouseIcon     = UIS.MouseIconEnabled
+    local prevMouseBehavior = UserInputService.MouseBehavior
+    local prevMouseIcon     = UserInputService.MouseIconEnabled
+    local prevCamType, prevCamSubject
 
     local function setMenuOpen(state)
         if menuOpen == state then return end
         menuOpen = state
-        getgenv()._xclientMenuOpen = state
-
         screenGui.Enabled   = state
         searchFrame.Visible = state
 
-        if state then
-            prevMouseBehavior = UIS.MouseBehavior
-            prevMouseIcon     = UIS.MouseIconEnabled
+        local camera = Workspace.CurrentCamera
 
-            getgenv()._xclientAllowMouseWrite = true
-            UIS.MouseIconEnabled = true
-            UIS.MouseBehavior    = Enum.MouseBehavior.Default
-            getgenv()._xclientAllowMouseWrite = false
+        if state then
+            -- сохраняем старые значения
+            prevMouseBehavior = UserInputService.MouseBehavior
+            prevMouseIcon     = UserInputService.MouseIconEnabled
+
+            if camera then
+                prevCamType    = camera.CameraType
+                prevCamSubject = camera.CameraSubject
+                camera.CameraType = Enum.CameraType.Scriptable
+            end
+
+            UserInputService.MouseIconEnabled = true
+            UserInputService.MouseBehavior    = Enum.MouseBehavior.Default
         else
-            getgenv()._xclientAllowMouseWrite = true
-            pcall(function()
-                UIS.MouseBehavior    = prevMouseBehavior or Enum.MouseBehavior.LockCenter
-                UIS.MouseIconEnabled = prevMouseIcon
+            local okCam, errCam = pcall(function()
+                if camera then
+                    camera.CameraType   = prevCamType or Enum.CameraType.Custom
+                    if prevCamSubject then
+                        camera.CameraSubject = prevCamSubject
+                    end
+                end
             end)
-            getgenv()._xclientAllowMouseWrite = false
+            if not okCam then
+                warn("[Xclient] Ошибка восстановления камеры:", errCam)
+            end
+
+            pcall(function()
+                UserInputService.MouseBehavior    = prevMouseBehavior or Enum.MouseBehavior.LockCenter
+                UserInputService.MouseIconEnabled = prevMouseIcon
+            end)
         end
     end
 
