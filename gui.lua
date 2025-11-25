@@ -168,19 +168,17 @@ function Gui.Init(ModuleManager)
     end
 
     ---------------------------------------------------
-    -- Пересборка колонок (для кнопки "Обновить")
+    -- Пересборка колонок (для «Обновить»)
     ---------------------------------------------------
     local function rebuildColumns()
         allButtons = {}
 
-        -- удаляем старые колонки, но оставляем UIListLayout
         for _, child in ipairs(mainFrame:GetChildren()) do
             if child:IsA("Frame") then
                 child:Destroy()
             end
         end
 
-        -- гарантируем наличие 5 категорий
         for _, cat in ipairs(preferredOrder) do
             ModuleManager.Categories[cat] = ModuleManager.Categories[cat] or {}
         end
@@ -212,8 +210,7 @@ function Gui.Init(ModuleManager)
         end
     end
 
-    -- первая сборка
-    rebuildColumns()
+    rebuildColumns() -- первая отрисовка
 
     ---------------------------------------------------
     -- Поиск снизу
@@ -258,12 +255,12 @@ function Gui.Init(ModuleManager)
     searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
 
     ---------------------------------------------------
-    -- Кнопка "Обновить"
+    -- Кнопка «Обновить» (левый верх угла экрана)
     ---------------------------------------------------
     local refreshButton = Instance.new("TextButton")
     refreshButton.Name = "RefreshButton"
-    refreshButton.Size = UDim2.new(0, 110, 0, 32)
-    refreshButton.Position = UDim2.new(0.5, -160 - 120, 0.5, 240)
+    refreshButton.Size = UDim2.new(0, 110, 0, 30)
+    refreshButton.Position = UDim2.new(0, 20, 0, 20)  -- ЛЕВО ВВЕРХУ
     refreshButton.BackgroundColor3 = Color3.fromRGB(20, 20, 32)
     refreshButton.BackgroundTransparency = 0.12
     refreshButton.BorderSizePixel = 0
@@ -310,33 +307,29 @@ function Gui.Init(ModuleManager)
     local menuOpen = false
 
     local function playOpenAnim()
-        screenGui.Enabled   = true
-        searchFrame.Visible = true
+        screenGui.Enabled     = true
+        searchFrame.Visible   = true
         refreshButton.Visible = true
 
-        mainFrame.Position    = UDim2.new(0.5, -550, 0.5, -260)
-        searchFrame.Position  = UDim2.new(0.5, -160, 0.5, 270)
-        refreshButton.Position= UDim2.new(0.5, -160 - 120, 0.5, 270)
+        mainFrame.Position   = UDim2.new(0.5, -550, 0.5, -260)
+        searchFrame.Position = UDim2.new(0.5, -160, 0.5, 270)
 
         local info = TweenInfo.new(0.23, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         TweenService:Create(mainFrame,  info, {Position = UDim2.new(0.5, -550, 0.5, -230)}):Play()
         TweenService:Create(searchFrame, info, {Position = UDim2.new(0.5, -160, 0.5, 240)}):Play()
-        TweenService:Create(refreshButton, info, {Position = UDim2.new(0.5, -160 - 120, 0.5, 240)}):Play()
     end
 
     local function playCloseAnim()
         local info = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
         local t1 = TweenService:Create(mainFrame,  info, {Position = UDim2.new(0.5, -550, 0.5, -260)})
         local t2 = TweenService:Create(searchFrame, info, {Position = UDim2.new(0.5, -160, 0.5, 270)})
-        local t3 = TweenService:Create(refreshButton, info, {Position = UDim2.new(0.5, -160 - 120, 0.5, 270)})
 
         t1:Play()
         t2:Play()
-        t3:Play()
-        t3.Completed:Connect(function()
+        t2.Completed:Connect(function()
             if not menuOpen then
-                screenGui.Enabled   = false
-                searchFrame.Visible = false
+                screenGui.Enabled     = false
+                searchFrame.Visible   = false
                 refreshButton.Visible = false
             end
         end)
