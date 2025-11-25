@@ -1,4 +1,4 @@
--- ===================== gui.lua (Xclient, без биндов и звука) ======================
+-- ===================== gui.lua (Xclient, с кнопкой Обновить) ======================
 
 local Gui = {}
 
@@ -37,6 +37,7 @@ function Gui.Init(ModuleManager)
     layout.Padding = UDim.new(0, 26)
 
     local allButtons = {} -- для поиска
+    local preferredOrder = {"Combat", "Movement", "Visuals", "Player", "Misc"}
 
     ---------------------------------------------------
     -- Твин цвета
@@ -119,7 +120,6 @@ function Gui.Init(ModuleManager)
 
             Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
 
-            -- точка состояния слева
             local stateDot = Instance.new("Frame")
             stateDot.Size = UDim2.new(0, 8, 0, 8)
             stateDot.Position = UDim2.new(0, 8, 0.5, -4)
@@ -161,7 +161,6 @@ function Gui.Init(ModuleManager)
             btn.MouseButton1Click:Connect(function()
                 ModuleManager:SetEnabled(mod, not mod.Enabled)
                 updateColors()
-                -- здесь раньше был звук, по твоей просьбе убран
             end)
 
             table.insert(allButtons, info)
@@ -169,38 +168,52 @@ function Gui.Init(ModuleManager)
     end
 
     ---------------------------------------------------
-    -- Гарантия 5 категорий
+    -- Пересборка колонок (для кнопки "Обновить")
     ---------------------------------------------------
-    local preferredOrder = {"Combat", "Movement", "Visuals", "Player", "Misc"}
-    for _, cat in ipairs(preferredOrder) do
-        ModuleManager.Categories[cat] = ModuleManager.Categories[cat] or {}
-    end
+    local function rebuildColumns()
+        allButtons = {}
 
-    local categoryNames = {}
-    for name, _ in pairs(ModuleManager.Categories) do
-        table.insert(categoryNames, name)
-    end
-
-    table.sort(categoryNames, function(a, b)
-        local ia, ib
-        for i, v in ipairs(preferredOrder) do
-            if v == a then ia = i end
-            if v == b then ib = i end
+        -- удаляем старые колонки, но оставляем UIListLayout
+        for _, child in ipairs(mainFrame:GetChildren()) do
+            if child:IsA("Frame") then
+                child:Destroy()
+            end
         end
-        if ia and ib then
-            return ia < ib
-        elseif ia then
-            return true
-        elseif ib then
-            return false
-        else
-            return a < b
-        end
-    end)
 
-    for _, catName in ipairs(categoryNames) do
-        createCategoryColumn(catName, ModuleManager.Categories[catName])
+        -- гарантируем наличие 5 категорий
+        for _, cat in ipairs(preferredOrder) do
+            ModuleManager.Categories[cat] = ModuleManager.Categories[cat] or {}
+        end
+
+        local categoryNames = {}
+        for name, _ in pairs(ModuleManager.Categories) do
+            table.insert(categoryNames, name)
+        end
+
+        table.sort(categoryNames, function(a, b)
+            local ia, ib
+            for i, v in ipairs(preferredOrder) do
+                if v == a then ia = i end
+                if v == b then ib = i end
+            end
+            if ia and ib then
+                return ia < ib
+            elseif ia then
+                return true
+            elseif ib then
+                return false
+            else
+                return a < b
+            end
+        end)
+
+        for _, catName in ipairs(categoryNames) do
+            createCategoryColumn(catName, ModuleManager.Categories[catName])
+        end
     end
+
+    -- первая сборка
+    rebuildColumns()
 
     ---------------------------------------------------
     -- Поиск снизу
@@ -245,6 +258,53 @@ function Gui.Init(ModuleManager)
     searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
 
     ---------------------------------------------------
+    -- Кнопка "Обновить"
+    ---------------------------------------------------
+    local refreshButton = Instance.new("TextButton")
+    refreshButton.Name = "RefreshButton"
+    refreshButton.Size = UDim2.new(0, 110, 0, 32)
+    refreshButton.Position = UDim2.new(0.5, -160 - 120, 0.5, 240)
+    refreshButton.BackgroundColor3 = Color3.fromRGB(20, 20, 32)
+    refreshButton.BackgroundTransparency = 0.12
+    refreshButton.BorderSizePixel = 0
+    refreshButton.AutoButtonColor = false
+    refreshButton.Font = Enum.Font.Gotham
+    refreshButton.TextSize = 14
+    refreshButton.TextColor3 = Color3.fromRGB(230, 230, 245)
+    refreshButton.Text = "Обновить"
+    refreshButton.Parent = screenGui
+
+    Instance.new("UICorner", refreshButton).CornerRadius = UDim.new(0, 8)
+
+    local refreshStroke = Instance.new("UIStroke", refreshButton)
+    refreshStroke.Color = Color3.fromRGB(80, 80, 130)
+    refreshStroke.Thickness = 1
+
+    refreshButton.MouseEnter:Connect(function()
+        tweenColor(refreshButton, Color3.fromRGB(30, 30, 52))
+    end)
+
+    refreshButton.MouseLeave:Connect(function()
+        tweenColor(refreshButton, Color3.fromRGB(20, 20, 32))
+    end)
+
+    refreshButton.MouseButton1Click:Connect(function()
+        if ModuleManager.ReloadFromManifest then
+            local ok, err = pcall(function()
+                ModuleManager:ReloadFromManifest()
+            end)
+            if ok then
+                rebuildColumns()
+                applySearch()
+            else
+                warn("[Xclient] ReloadFromManifest error:", err)
+            end
+        else
+            warn("[Xclient] ReloadFromManifest не реализован в main.lua")
+        end
+    end)
+
+    ---------------------------------------------------
     -- Анимация открытия/закрытия
     ---------------------------------------------------
     local menuOpen = false
@@ -252,26 +312,32 @@ function Gui.Init(ModuleManager)
     local function playOpenAnim()
         screenGui.Enabled   = true
         searchFrame.Visible = true
+        refreshButton.Visible = true
 
-        mainFrame.Position   = UDim2.new(0.5, -550, 0.5, -260)
-        searchFrame.Position = UDim2.new(0.5, -160, 0.5, 270)
+        mainFrame.Position    = UDim2.new(0.5, -550, 0.5, -260)
+        searchFrame.Position  = UDim2.new(0.5, -160, 0.5, 270)
+        refreshButton.Position= UDim2.new(0.5, -160 - 120, 0.5, 270)
 
         local info = TweenInfo.new(0.23, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         TweenService:Create(mainFrame,  info, {Position = UDim2.new(0.5, -550, 0.5, -230)}):Play()
         TweenService:Create(searchFrame, info, {Position = UDim2.new(0.5, -160, 0.5, 240)}):Play()
+        TweenService:Create(refreshButton, info, {Position = UDim2.new(0.5, -160 - 120, 0.5, 240)}):Play()
     end
 
     local function playCloseAnim()
         local info = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
         local t1 = TweenService:Create(mainFrame,  info, {Position = UDim2.new(0.5, -550, 0.5, -260)})
         local t2 = TweenService:Create(searchFrame, info, {Position = UDim2.new(0.5, -160, 0.5, 270)})
+        local t3 = TweenService:Create(refreshButton, info, {Position = UDim2.new(0.5, -160 - 120, 0.5, 270)})
 
         t1:Play()
         t2:Play()
-        t2.Completed:Connect(function()
+        t3:Play()
+        t3.Completed:Connect(function()
             if not menuOpen then
                 screenGui.Enabled   = false
                 searchFrame.Visible = false
+                refreshButton.Visible = false
             end
         end)
     end
