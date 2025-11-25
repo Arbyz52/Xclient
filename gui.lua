@@ -5,10 +5,6 @@ local Gui = {}
 function Gui.Init(ModuleManager)
     local UserInputService = game:GetService("UserInputService")
     local CoreGui          = game:GetService("CoreGui")
-    local Players          = game:GetService("Players")
-    local RunService       = game:GetService("RunService")
-
-    local localPlayer = Players.LocalPlayer
 
     ---------------------------------------------------
     -- ScreenGui
@@ -37,7 +33,7 @@ function Gui.Init(ModuleManager)
 
     local layout = Instance.new("UIListLayout", mainFrame)
     layout.FillDirection = Enum.FillDirection.Horizontal
-    layout.Padding = UDim.new(0, 24) -- побольше отступ между колонками
+    layout.Padding = UDim.new(0, 24) -- отступ между колонками
 
     local allButtons = {} -- {button=..., mod=...}
 
@@ -51,13 +47,12 @@ function Gui.Init(ModuleManager)
 
         local colFrame = Instance.new("Frame")
         colFrame.Name = categoryName
-        colFrame.Size = UDim2.new(0, 200, 1, 0) -- колонки побольше
+        colFrame.Size = UDim2.new(0, 200, 1, 0) -- шире и выше
         colFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 30)
         colFrame.BorderSizePixel = 0
         colFrame.Parent = mainFrame
 
-        local colCorner = Instance.new("UICorner", colFrame)
-        colCorner.CornerRadius = UDim.new(0, 10)
+        Instance.new("UICorner", colFrame).CornerRadius = UDim.new(0, 10)
 
         local colStroke = Instance.new("UIStroke", colFrame)
         colStroke.Color = Color3.fromRGB(60, 60, 90)
@@ -105,20 +100,18 @@ function Gui.Init(ModuleManager)
             btn.TextSize = 14
             btn.TextColor3 = Color3.fromRGB(210, 210, 220)
             btn.TextXAlignment = Enum.TextXAlignment.Left
-            btn.Text = "      " .. mod.Name -- отступ под точку слева
+            btn.Text = "      " .. mod.Name  -- отступ под точку слева
             btn.Parent = holder
 
-            local btnCorner = Instance.new("UICorner", btn)
-            btnCorner.CornerRadius = UDim.new(0, 8)
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
 
-            -- индикатор состояния (точка слева)
+            -- точка состояния слева
             local stateDot = Instance.new("Frame")
             stateDot.Size = UDim2.new(0, 8, 0, 8)
             stateDot.Position = UDim2.new(0, 8, 0.5, -4)
             stateDot.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
             stateDot.BorderSizePixel = 0
             stateDot.Parent = btn
-
             Instance.new("UICorner", stateDot).CornerRadius = UDim.new(1, 0)
 
             -- три точки справа
@@ -236,44 +229,15 @@ function Gui.Init(ModuleManager)
     searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
 
     ---------------------------------------------------
-    -- Курсор и RightShift
+    -- Открытие/закрытие (RightShift), курсор НЕ трогаем
     ---------------------------------------------------
     local menuOpen = false
-    local prevMouseBehavior = UserInputService.MouseBehavior
-    local prevMouseIcon     = UserInputService.MouseIconEnabled
-    local cursorConn        = nil
 
     local function setMenuOpen(state)
         if menuOpen == state then return end
         menuOpen = state
         screenGui.Enabled   = state
         searchFrame.Visible = state
-
-        if state then
-            prevMouseBehavior = UserInputService.MouseBehavior
-            prevMouseIcon     = UserInputService.MouseIconEnabled
-
-            UserInputService.MouseIconEnabled = true
-            UserInputService.MouseBehavior    = Enum.MouseBehavior.Default
-
-            -- каждый кадр удерживаем мышь в Default,
-            -- чтобы игра не перехватывала её обратно
-            cursorConn = RunService.RenderStepped:Connect(function()
-                if UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default then
-                    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-                end
-            end)
-        else
-            if cursorConn then
-                cursorConn:Disconnect()
-                cursorConn = nil
-            end
-
-            pcall(function()
-                UserInputService.MouseBehavior    = prevMouseBehavior
-                UserInputService.MouseIconEnabled = prevMouseIcon
-            end)
-        end
     end
 
     UserInputService.InputBegan:Connect(function(input, gp)
