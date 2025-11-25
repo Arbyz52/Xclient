@@ -114,7 +114,7 @@ function Gui.Init(ModuleManager)
         title.Text = categoryName
         title.TextColor3 = Color3.fromRGB(245, 245, 255)
         title.TextSize = 18
-        title.TextXAlignment = Enum.TextXAlignment.Center -- центр
+        title.TextXAlignment = Enum.TextXAlignment.Center -- по центру
         title.Parent = titleBar
 
         local holder = Instance.new("Frame")
@@ -154,7 +154,7 @@ function Gui.Init(ModuleManager)
             stateDot.Parent = btn
             Instance.new("UICorner", stateDot).CornerRadius = UDim.new(1, 0)
 
-            -- правый лейбл: или "..." (нет бинда), или имя клавиши
+            -- правый лейбл: "..." (нет бинда) или имя клавиши
             local bindLabel = Instance.new("TextLabel")
             bindLabel.Size = UDim2.new(0, 40, 1, 0)
             bindLabel.Position = UDim2.new(1, -30, 0, 0)
@@ -163,7 +163,7 @@ function Gui.Init(ModuleManager)
             bindLabel.TextColor3 = Color3.fromRGB(160, 160, 195)
             bindLabel.TextSize = 13
             bindLabel.TextXAlignment = Enum.TextXAlignment.Right
-            bindLabel.Text = "..."              -- по умолчанию тройточие
+            bindLabel.Text = "..."
             bindLabel.Parent = btn
 
             local info = {
