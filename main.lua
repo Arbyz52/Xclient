@@ -1,58 +1,78 @@
--- ===================== main.lua (GitHub) ======================
--- Запуск:
+-- ===================== main.lua (GitHub + manifest) ======================
+-- Запуск из игры:
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/Arbyz52/Xclient/main/main.lua"))()
 
 local GITHUB_USER   = "Arbyz52"
 local GITHUB_REPO   = "Xclient"
 local GITHUB_BRANCH = "main"
 
-local API_BASE = string.format(
-    "https://api.github.com/repos/%s/%s/contents/modules",
-    GITHUB_USER, GITHUB_REPO
-)
-
-local GUI_RAW_URL = string.format(
-    "https://raw.githubusercontent.com/%s/%s/%s/gui.lua",
+local RAW_BASE = string.format(
+    "https://raw.githubusercontent.com/%s/%s/%s/",
     GITHUB_USER, GITHUB_REPO, GITHUB_BRANCH
 )
 
-local HttpService      = game:GetService("HttpService")
-local RunService       = game:GetService("RunService")
+local MANIFEST_URL = RAW_BASE .. "manifest.json"
+local GUI_URL      = RAW_BASE .. "gui.lua"
 
----------------------------------------------------------
--- HTTP GET (стабильный, без лишних хедеров)
----------------------------------------------------------
+local HttpService = game:GetService("HttpService")
+local RunService  = game:GetService("RunService")
 
+----------------------------------------------------------------
+-- HTTP GET (без лишних заголовков)
+----------------------------------------------------------------
 local function httpGet(url)
-    -- пробуем сначала Roblox HttpGet
+    -- 1) Roblox HttpGet
     if game and game.HttpGet then
-        local ok, res = pcall(game.HttpGet, game, url)
-        if ok then return res end
+        local ok, res = pcall(function()
+            return game:HttpGet(url)
+        end)
+        if ok and type(res) == "string" then
+            return res
+        end
     end
 
-    -- далее экзекьюторные функции (без заголовков)
+    -- 2) syn.request
     if syn and syn.request then
-        local res = syn.request({ Url = url, Method = "GET" })
-        return res.Body or res.body
+        local ok, res = pcall(syn.request, {
+            Url = url,
+            Method = "GET",
+        })
+        if ok and res and (res.Body or res.body) then
+            return res.Body or res.body
+        end
     end
 
+    -- 3) http_request
     if http_request then
-        local res = http_request({ Url = url, Method = "GET" })
-        return res.Body or res.body
+        local ok, res = pcall(http_request, {
+            Url = url,
+            Method = "GET",
+        })
+        if ok and res and (res.Body or res.body) then
+            return res.Body or res.body
+        end
     end
 
+    -- 4) request
     if request then
-        local res = request({ Url = url, Method = "GET" })
-        return res.Body or res.body
+        local ok, res = pcall(request, {
+            Url = url,
+            Method = "GET",
+        })
+        if ok and res and (res.Body or res.body) then
+            return res.Body or res.body
+        end
     end
 
-    -- HttpService как крайний случай
+    -- 5) HttpService:GetAsync
     local ok, res = pcall(function()
         return HttpService:GetAsync(url)
     end)
-    if ok then return res end
+    if ok and type(res) == "string" then
+        return res
+    end
 
-    error("[Xclient] Нет доступного способа HTTP GET")
+    error("[Xclient] HTTP GET провалился для URL: " .. tostring(url))
 end
 
 local function getJSON(url)
@@ -60,10 +80,9 @@ local function getJSON(url)
     return HttpService:JSONDecode(body)
 end
 
----------------------------------------------------------
+----------------------------------------------------------------
 -- ModuleManager
----------------------------------------------------------
-
+----------------------------------------------------------------
 local ModuleManager = {
     Modules    = {},
     Categories = {},
@@ -108,75 +127,71 @@ function ModuleManager:Tick(dt)
     end
 end
 
----------------------------------------------------------
--- ЗАГРУЗКА МОДУЛЕЙ ЧЕРЕЗ GitHub API (без manifest.json)
----------------------------------------------------------
+----------------------------------------------------------------
+-- ЗАГРУЗКА МОДУЛЕЙ ИЗ manifest.json
+----------------------------------------------------------------
+local function loadModulesFromManifest()
+    print("[Xclient] Загружаю manifest.json...")
 
-local function loadModulesFromGitHub()
-    print("[Xclient] Загружаю модули из GitHub (API)...")
-
-    local categories
+    local manifest
     local ok, err = pcall(function()
-        categories = getJSON(API_BASE .. "?ref=" .. GITHUB_BRANCH)
+        manifest = getJSON(MANIFEST_URL)
     end)
 
     if not ok then
-        warn("[Xclient] Не удалось получить список категорий:", err)
+        warn("[Xclient] Не удалось загрузить manifest.json:", err)
         return
     end
 
-    local loaded = 0
+    if type(manifest) ~= "table" or type(manifest.modules) ~= "table" then
+        warn("[Xclient] Неверный формат manifest.json")
+        return
+    end
 
-    for _, cat in ipairs(categories) do
-        if cat.type == "dir" then
-            local categoryName = cat.name
+    local count = 0
 
-            local files
-            local ok2, err2 = pcall(function()
-                files = getJSON(cat.url .. "?ref=" .. GITHUB_BRANCH)
-            end)
+    for _, entry in ipairs(manifest.modules) do
+        if type(entry.path) == "string" then
+            local path     = entry.path
+            local category = entry.category or "Misc"
+            local name     = entry.name     or path
 
-            if not ok2 then
-                warn("[Xclient] Ошибка списка файлов для", categoryName, ":", err2)
+            local url = RAW_BASE .. path
+
+            local codeOK, code = pcall(httpGet, url)
+            if not codeOK then
+                warn("[Xclient] Не удалось скачать модуль", path, ":", code)
             else
-                for _, f in ipairs(files) do
-                    if f.type == "file" and f.name:sub(-4):lower() == ".lua" then
-                        local codeOK, code = pcall(httpGet, f.download_url)
-                        if not codeOK then
-                            warn("[Xclient] Не удалось скачать модуль", f.path, ":", code)
-                        else
-                            local chunk, lerr = loadstring(code, "@" .. f.path)
-                            if not chunk then
-                                warn("[Xclient] loadstring ошибка", f.path, ":", lerr)
-                            else
-                                local ok3, mod = pcall(chunk)
-                                if not ok3 then
-                                    warn("[Xclient] runtime ошибка", f.path, ":", mod)
-                                elseif type(mod) == "table" then
-                                    mod.Category = mod.Category or categoryName
-                                    ModuleManager:RegisterModule(mod)
-                                    loaded += 1
-                                    print("[Xclient] Модуль загружен:", categoryName .. "/" .. (mod.Name or f.name))
-                                else
-                                    warn("[Xclient] Модуль", f.path, "не вернул таблицу")
-                                end
-                            end
-                        end
+                local chunk, lerr = loadstring(code, "@" .. path)
+                if not chunk then
+                    warn("[Xclient] Ошибка loadstring в модуле", path, ":", lerr)
+                else
+                    local ok2, mod = pcall(chunk)
+                    if not ok2 then
+                        warn("[Xclient] Ошибка при выполнении модуля", path, ":", mod)
+                    elseif type(mod) == "table" then
+                        -- приоритет за manifest.json
+                        mod.Category = category
+                        mod.Name     = name
+                        ModuleManager:RegisterModule(mod)
+                        count += 1
+                        print("[Xclient] Модуль загружен:", category .. "/" .. name)
+                    else
+                        warn("[Xclient] Модуль", path, "не вернул таблицу")
                     end
                 end
             end
         end
     end
 
-    print("[Xclient] Загрузка модулей завершена, всего:", loaded)
+    print("[Xclient] Загрузка модулей завершена, всего:", count)
 end
 
----------------------------------------------------------
--- ЗАГРУЗКА GUI
----------------------------------------------------------
-
+----------------------------------------------------------------
+-- ЗАГРУЗКА GUI С GITHUB
+----------------------------------------------------------------
 local function initGUI()
-    local code = httpGet(GUI_RAW_URL)
+    local code = httpGet(GUI_URL)
     local chunk, err = loadstring(code, "@gui.lua")
     if not chunk then
         warn("[Xclient] Ошибка loadstring gui.lua:", err)
@@ -196,11 +211,10 @@ local function initGUI()
     end
 end
 
----------------------------------------------------------
+----------------------------------------------------------------
 -- СТАРТ
----------------------------------------------------------
-
-loadModulesFromGitHub()
+----------------------------------------------------------------
+loadModulesFromManifest()
 initGUI()
 
 RunService.RenderStepped:Connect(function(dt)
