@@ -1,4 +1,4 @@
--- ===================== gui.lua (Xclient, без биндов) ======================
+-- ===================== gui.lua (Xclient, без биндов и звука) ======================
 
 local Gui = {}
 
@@ -6,23 +6,6 @@ function Gui.Init(ModuleManager)
     local UserInputService = game:GetService("UserInputService")
     local CoreGui          = game:GetService("CoreGui")
     local TweenService     = game:GetService("TweenService")
-    local Debris           = game:GetService("Debris")
-    local Workspace        = game:GetService("Workspace")
-
-    ---------------------------------------------------
-    -- Звук переключения
-    ---------------------------------------------------
-    local TOGGLE_SOUND_ID = "rbxassetid://87437544236708" -- твой звук
-
-    local function playToggle()
-        local s = Instance.new("Sound")
-        s.SoundId = TOGGLE_SOUND_ID
-        s.Volume = 0.7
-        s.RollOffMaxDistance = 10000
-        s.Parent = Workspace
-        s:Play()
-        Debris:AddItem(s, 3)
-    end
 
     ---------------------------------------------------
     -- ScreenGui
@@ -105,7 +88,7 @@ function Gui.Init(ModuleManager)
         title.Text = categoryName
         title.TextColor3 = Color3.fromRGB(245, 245, 255)
         title.TextSize = 18
-        title.TextXAlignment = Enum.TextXAlignment.Center -- по центру
+        title.TextXAlignment = Enum.TextXAlignment.Center
         title.Parent = titleBar
 
         local holder = Instance.new("Frame")
@@ -154,11 +137,11 @@ function Gui.Init(ModuleManager)
             local function updateColors()
                 if mod.Enabled then
                     tweenColor(btn, Color3.fromRGB(95, 155, 245))
-                    btn.TextColor3       = Color3.fromRGB(255, 255, 255)
+                    btn.TextColor3            = Color3.fromRGB(255, 255, 255)
                     stateDot.BackgroundColor3 = Color3.fromRGB(170, 215, 255)
                 else
                     tweenColor(btn, Color3.fromRGB(30, 30, 56))
-                    btn.TextColor3       = Color3.fromRGB(215, 215, 232)
+                    btn.TextColor3            = Color3.fromRGB(215, 215, 232)
                     stateDot.BackgroundColor3 = Color3.fromRGB(110, 110, 155)
                 end
             end
@@ -178,7 +161,7 @@ function Gui.Init(ModuleManager)
             btn.MouseButton1Click:Connect(function()
                 ModuleManager:SetEnabled(mod, not mod.Enabled)
                 updateColors()
-                playToggle()
+                -- здесь раньше был звук, по твоей просьбе убран
             end)
 
             table.insert(allButtons, info)
@@ -186,7 +169,7 @@ function Gui.Init(ModuleManager)
     end
 
     ---------------------------------------------------
-    -- Гарантируем 5 категорий
+    -- Гарантия 5 категорий
     ---------------------------------------------------
     local preferredOrder = {"Combat", "Movement", "Visuals", "Player", "Misc"}
     for _, cat in ipairs(preferredOrder) do
@@ -304,7 +287,7 @@ function Gui.Init(ModuleManager)
     end
 
     ---------------------------------------------------
-    -- Управление
+    -- Управление (RightShift + поиск)
     ---------------------------------------------------
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
