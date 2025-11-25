@@ -7,274 +7,315 @@ local module = {
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
-local Camera = workspace.CurrentCamera
+local Workspace = game:GetService("Workspace")
+
 local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
 
 -- Настройки ESP
-local Settings = {
-    BoxColor = Color3.fromRGB(255, 0, 0),
-    NameColor = Color3.fromRGB(255, 255, 255),
-    HealthBarColor = Color3.fromRGB(0, 255, 0),
-    MaxDistance = 1000,
-    TeamCheck = true,
+module.Settings = {
     ShowBox = true,
     ShowName = true,
+    ShowDistance = true,
     ShowHealth = true,
-    ShowDistance = true
+    ShowTracers = false,
+    TeamCheck = false,
+    MaxDistance = 1000,
+    BoxColor = Color3.fromRGB(255, 255, 255),
+    TeamColor = true,
 }
 
 module._gui = nil
 module._espObjects = {}
-module._connections = {}
 
 function module:Init()
     print("[Xclient][ESP] Init()")
 end
 
--- Создание ESP элементов для игрока
 function module:CreateESP(player)
     if player == LocalPlayer then return end
     
-    local espHolder = Instance.new("Folder")
-    espHolder.Name = player.Name .. "_ESP"
+    -- Контейнер для бокса
+    local boxFrame = Instance.new("Frame")
+    boxFrame.Name = "BoxFrame_" .. player.Name
+    boxFrame.BackgroundTransparency = 1
+    boxFrame.Size = UDim2.new(0, 100, 0, 100)
+    boxFrame.Position = UDim2.new(0, 0, 0, 0)
+    boxFrame.Parent = self._gui
     
-    -- Бокс вокруг игрока
-    local box = Instance.new("Frame")
-    box.Name = "Box"
-    box.BackgroundTransparency = 1
-    box.BorderSizePixel = 0
+    -- Создание линий бокса
+    local function createLine(name, position, size)
+        local line = Instance.new("Frame")
+        line.Name = name
+        line.Size = size
+        line.Position = position
+        line.BorderSizePixel = 0
+        line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        line.Parent = boxFrame
+        return line
+    end
     
-    local boxOutline = Instance.new("UIStroke")
-    boxOutline.Color = Settings.BoxColor
-    boxOutline.Thickness = 2
-    boxOutline.Parent = box
+    -- 4 линии (верх, низ, лево, право)
+    local topLine = createLine("Top", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 2))
+    local bottomLine = createLine("Bottom", UDim2.new(0, 0, 1, -2), UDim2.new(1, 0, 0, 2))
+    local leftLine = createLine("Left", UDim2.new(0, 0, 0, 0), UDim2.new(0, 2, 1, 0))
+    local rightLine = createLine("Right", UDim2.new(1, -2, 0, 0), UDim2.new(0, 2, 1, 0))
     
     -- Имя игрока
     local nameLabel = Instance.new("TextLabel")
-    nameLabel.Name = "Name"
-    nameLabel.Text = player.Name
-    nameLabel.TextColor3 = Settings.NameColor
-    nameLabel.TextStrokeTransparency = 0
-    nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+    nameLabel.Name = "NameLabel"
+    nameLabel.Size = UDim2.new(1, 0, 0, 20)
+    nameLabel.Position = UDim2.new(0, 0, 0, -22)
     nameLabel.BackgroundTransparency = 1
-    nameLabel.Font = Enum.Font.SourceSansBold
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.Text = player.Name
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     nameLabel.TextSize = 14
-    nameLabel.Size = UDim2.new(0, 100, 0, 20)
+    nameLabel.TextStrokeTransparency = 0.5
+    nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    nameLabel.Parent = boxFrame
     
-    -- Дистанция
+    -- Расстояние
     local distanceLabel = Instance.new("TextLabel")
-    distanceLabel.Name = "Distance"
-    distanceLabel.TextColor3 = Settings.NameColor
-    distanceLabel.TextStrokeTransparency = 0
-    distanceLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+    distanceLabel.Name = "DistanceLabel"
+    distanceLabel.Size = UDim2.new(1, 0, 0, 18)
+    distanceLabel.Position = UDim2.new(0, 0, 1, 2)
     distanceLabel.BackgroundTransparency = 1
-    distanceLabel.Font = Enum.Font.SourceSans
+    distanceLabel.Font = Enum.Font.Gotham
+    distanceLabel.Text = "0m"
+    distanceLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     distanceLabel.TextSize = 12
-    distanceLabel.Size = UDim2.new(0, 100, 0, 20)
+    distanceLabel.TextStrokeTransparency = 0.5
+    distanceLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    distanceLabel.Parent = boxFrame
     
-    -- Полоска здоровья
+    -- Здоровье бар
+    local healthBarBg = Instance.new("Frame")
+    healthBarBg.Name = "HealthBarBg"
+    healthBarBg.Size = UDim2.new(0, 3, 1, 0)
+    healthBarBg.Position = UDim2.new(0, -6, 0, 0)
+    healthBarBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    healthBarBg.BorderSizePixel = 1
+    healthBarBg.BorderColor3 = Color3.fromRGB(255, 255, 255)
+    healthBarBg.Parent = boxFrame
+    
     local healthBar = Instance.new("Frame")
     healthBar.Name = "HealthBar"
-    healthBar.BackgroundColor3 = Color3.new(0, 0, 0)
+    healthBar.Size = UDim2.new(1, 0, 1, 0)
+    healthBar.Position = UDim2.new(0, 0, 0, 0)
+    healthBar.AnchorPoint = Vector2.new(0, 1)
+    healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
     healthBar.BorderSizePixel = 0
-    healthBar.Size = UDim2.new(0, 4, 1, 0)
+    healthBar.Parent = healthBarBg
     
-    local healthFill = Instance.new("Frame")
-    healthFill.Name = "Fill"
-    healthFill.BackgroundColor3 = Settings.HealthBarColor
-    healthFill.BorderSizePixel = 0
-    healthFill.Parent = healthBar
-    
-    -- Добавляем все элементы
-    box.Parent = self._gui
-    nameLabel.Parent = self._gui
-    distanceLabel.Parent = self._gui
-    healthBar.Parent = self._gui
+    -- Трейсер
+    local tracer = Instance.new("Frame")
+    tracer.Name = "Tracer_" .. player.Name
+    tracer.Size = UDim2.new(0, 2, 0, 100)
+    tracer.AnchorPoint = Vector2.new(0.5, 0)
+    tracer.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    tracer.BorderSizePixel = 0
+    tracer.Visible = false
+    tracer.Parent = self._gui
     
     self._espObjects[player] = {
-        Box = box,
-        Name = nameLabel,
-        Distance = distanceLabel,
-        HealthBar = healthBar,
-        HealthFill = healthFill
+        player = player,
+        boxFrame = boxFrame,
+        nameLabel = nameLabel,
+        distanceLabel = distanceLabel,
+        healthBar = healthBar,
+        healthBarBg = healthBarBg,
+        tracer = tracer,
+        lines = {topLine, bottomLine, leftLine, rightLine},
     }
 end
 
--- Удаление ESP элементов игрока
 function module:RemoveESP(player)
-    local esp = self._espObjects[player]
-    if esp then
-        for _, obj in pairs(esp) do
-            if obj.Parent then
-                obj:Destroy()
-            end
-        end
+    local espObj = self._espObjects[player]
+    if espObj then
+        if espObj.boxFrame then espObj.boxFrame:Destroy() end
+        if espObj.tracer then espObj.tracer:Destroy() end
         self._espObjects[player] = nil
     end
 end
 
--- Обновление ESP для конкретного игрока
-function module:UpdatePlayerESP(player)
-    local esp = self._espObjects[player]
-    if not esp then return end
-    
+function module:UpdateESP(espObj)
+    local player = espObj.player
     local character = player.Character
+    
     if not character then
-        for _, obj in pairs(esp) do
-            obj.Visible = false
-        end
+        espObj.boxFrame.Visible = false
+        espObj.tracer.Visible = false
         return
     end
     
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
     local humanoid = character:FindFirstChild("Humanoid")
     
-    if not humanoidRootPart or not humanoid then
-        for _, obj in pairs(esp) do
-            obj.Visible = false
-        end
+    if not rootPart or not humanoid or humanoid.Health <= 0 then
+        espObj.boxFrame.Visible = false
+        espObj.tracer.Visible = false
         return
     end
     
     -- Проверка команды
-    if Settings.TeamCheck and player.Team == LocalPlayer.Team then
-        for _, obj in pairs(esp) do
-            obj.Visible = false
-        end
+    if self.Settings.TeamCheck and player.Team == LocalPlayer.Team then
+        espObj.boxFrame.Visible = false
+        espObj.tracer.Visible = false
         return
     end
     
-    -- Расчет расстояния
-    local distance = (humanoidRootPart.Position - Camera.CFrame.Position).Magnitude
+    -- Проверка расстояния
+    local localRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not localRoot then return end
     
-    if distance > Settings.MaxDistance then
-        for _, obj in pairs(esp) do
-            obj.Visible = false
-        end
+    local distance = (localRoot.Position - rootPart.Position).Magnitude
+    if distance > self.Settings.MaxDistance then
+        espObj.boxFrame.Visible = false
+        espObj.tracer.Visible = false
         return
     end
     
-    -- Получаем позицию на экране
-    local screenPos, onScreen = Camera:WorldToViewportPoint(humanoidRootPart.Position)
+    -- Конвертация 3D в 2D
+    local vector, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
     
     if not onScreen then
-        for _, obj in pairs(esp) do
-            obj.Visible = false
-        end
+        espObj.boxFrame.Visible = false
+        espObj.tracer.Visible = false
         return
     end
     
-    -- Расчет размера бокса на основе расстояния
+    -- Вычисление размера бокса
     local head = character:FindFirstChild("Head")
-    local rootPos = Camera:WorldToViewportPoint(humanoidRootPart.Position)
-    local headPos = head and Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0)) or rootPos
-    local legPos = Camera:WorldToViewportPoint(humanoidRootPart.Position - Vector3.new(0, 3, 0))
+    if not head then return end
     
-    local boxHeight = math.abs(headPos.Y - legPos.Y)
-    local boxWidth = boxHeight * 0.5
+    local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+    local legPos = Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3, 0))
     
-    -- Обновляем бокс
-    esp.Box.Size = UDim2.new(0, boxWidth, 0, boxHeight)
-    esp.Box.Position = UDim2.new(0, screenPos.X - boxWidth / 2, 0, headPos.Y)
-    esp.Box.Visible = Settings.ShowBox
+    local height = math.abs(headPos.Y - legPos.Y)
+    local width = height / 2
     
-    -- Обновляем имя
-    esp.Name.Position = UDim2.new(0, screenPos.X - 50, 0, headPos.Y - 25)
-    esp.Name.Visible = Settings.ShowName
+    -- Обновление бокса
+    espObj.boxFrame.Position = UDim2.new(0, vector.X - width/2, 0, headPos.Y)
+    espObj.boxFrame.Size = UDim2.new(0, width, 0, height)
+    espObj.boxFrame.Visible = self.Settings.ShowBox
     
-    -- Обновляем дистанцию
-    esp.Distance.Text = math.floor(distance) .. "m"
-    esp.Distance.Position = UDim2.new(0, screenPos.X - 50, 0, legPos.Y + 5)
-    esp.Distance.Visible = Settings.ShowDistance
-    
-    -- Обновляем полоску здоровья
-    local healthPercent = humanoid.Health / humanoid.MaxHealth
-    esp.HealthBar.Position = UDim2.new(0, screenPos.X - boxWidth / 2 - 8, 0, headPos.Y)
-    esp.HealthBar.Size = UDim2.new(0, 4, 0, boxHeight)
-    esp.HealthFill.Size = UDim2.new(1, 0, healthPercent, 0)
-    esp.HealthFill.Position = UDim2.new(0, 0, 1 - healthPercent, 0)
-    
-    -- Меняем цвет здоровья в зависимости от процента
-    if healthPercent > 0.66 then
-        esp.HealthFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    elseif healthPercent > 0.33 then
-        esp.HealthFill.BackgroundColor3 = Color3.fromRGB(255, 255, 0)
-    else
-        esp.HealthFill.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    -- Цвет
+    local color = self.Settings.BoxColor
+    if self.Settings.TeamColor and player.Team then
+        color = player.Team.TeamColor.Color
     end
     
-    esp.HealthBar.Visible = Settings.ShowHealth
+    for _, line in pairs(espObj.lines) do
+        line.BackgroundColor3 = color
+    end
+    
+    -- Имя
+    espObj.nameLabel.Visible = self.Settings.ShowName
+    espObj.nameLabel.TextColor3 = color
+    
+    -- Расстояние
+    if self.Settings.ShowDistance then
+        espObj.distanceLabel.Visible = true
+        espObj.distanceLabel.Text = string.format("%dm", math.floor(distance))
+    else
+        espObj.distanceLabel.Visible = false
+    end
+    
+    -- Здоровье
+    if self.Settings.ShowHealth then
+        local healthPercent = humanoid.Health / humanoid.MaxHealth
+        espObj.healthBar.Size = UDim2.new(1, 0, healthPercent, 0)
+        espObj.healthBar.Position = UDim2.new(0, 0, 1, 0)
+        
+        local r = math.floor((1 - healthPercent) * 255)
+        local g = math.floor(healthPercent * 255)
+        espObj.healthBar.BackgroundColor3 = Color3.fromRGB(r, g, 0)
+        espObj.healthBarBg.Visible = true
+    else
+        espObj.healthBarBg.Visible = false
+    end
+    
+    -- Трейсер
+    if self.Settings.ShowTracers then
+        local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+        local playerPos = Vector2.new(vector.X, vector.Y)
+        
+        local distance2D = (playerPos - screenCenter).Magnitude
+        local angle = math.atan2(playerPos.Y - screenCenter.Y, playerPos.X - screenCenter.X)
+        
+        espObj.tracer.Position = UDim2.new(0, screenCenter.X, 0, screenCenter.Y)
+        espObj.tracer.Size = UDim2.new(0, 2, 0, distance2D)
+        espObj.tracer.Rotation = math.deg(angle) + 90
+        espObj.tracer.BackgroundColor3 = color
+        espObj.tracer.Visible = true
+    else
+        espObj.tracer.Visible = false
+    end
 end
 
 function module:OnEnable()
     print("[Xclient][ESP] Включен")
-    
+
     if self._gui then
         self._gui.Enabled = true
-    else
-        -- Создаем GUI
-        local screenGui = Instance.new("ScreenGui")
-        screenGui.Name = "Xclient_ESP"
-        screenGui.ResetOnSpawn = false
-        screenGui.IgnoreGuiInset = true
-        
-        local parent = CoreGui
-        pcall(function()
-            if gethui then parent = gethui() end
-        end)
-        screenGui.Parent = parent
-        
-        self._gui = screenGui
+        for _, player in pairs(Players:GetPlayers()) do
+            if not self._espObjects[player] then
+                self:CreateESP(player)
+            end
+        end
+        return
+    end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "Xclient_ESP"
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
+
+    local parent = CoreGui
+    pcall(function()
+        if gethui then parent = gethui() end
+    end)
+    screenGui.Parent = parent
+
+    self._gui = screenGui
+    
+    -- Создаем ESP для всех игроков
+    for _, player in pairs(Players:GetPlayers()) do
+        self:CreateESP(player)
     end
     
-    -- Создаем ESP для всех существующих игроков
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
+    -- События
+    Players.PlayerAdded:Connect(function(player)
+        if self.Enabled then
+            task.wait(0.5)
             self:CreateESP(player)
         end
-    end
-    
-    -- Подключаем события
-    self._connections.playerAdded = Players.PlayerAdded:Connect(function(player)
-        self:CreateESP(player)
     end)
     
-    self._connections.playerRemoving = Players.PlayerRemoving:Connect(function(player)
+    Players.PlayerRemoving:Connect(function(player)
         self:RemoveESP(player)
-    end)
-    
-    -- Обновление ESP
-    self._connections.renderStepped = RunService.RenderStepped:Connect(function()
-        for player, _ in pairs(self._espObjects) do
-            self:UpdatePlayerESP(player)
-        end
     end)
 end
 
 function module:OnDisable()
     print("[Xclient][ESP] Выключен")
-    
-    -- Отключаем GUI
     if self._gui then
         self._gui.Enabled = false
-    end
-    
-    -- Отключаем все соединения
-    for _, connection in pairs(self._connections) do
-        if connection then
-            connection:Disconnect()
-        end
-    end
-    self._connections = {}
-    
-    -- Удаляем все ESP объекты
-    for player, _ in pairs(self._espObjects) do
-        self:RemoveESP(player)
     end
 end
 
 function module:OnTick(dt)
-    -- OnTick не используется, так как обновление происходит через RenderStepped
+    if not self.Enabled then return end
+    if not self._gui then return end
+    
+    for player, espObj in pairs(self._espObjects) do
+        if player and player.Parent then
+            self:UpdateESP(espObj)
+        else
+            self:RemoveESP(player)
+        end
+    end
 end
 
 return module
