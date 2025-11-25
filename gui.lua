@@ -11,7 +11,7 @@ function Gui.Init(ModuleManager)
     ---------------------------------------------------
     -- Звук переключения
     ---------------------------------------------------
-    local TOGGLE_SOUND_ID = "rbxassetid://12222005" -- можешь поменять на любой свой
+    local TOGGLE_SOUND_ID = "rbxassetid://87437544236708" -- можешь поменять на любой свой
 
     local toggleSound = Instance.new("Sound")
     toggleSound.SoundId = TOGGLE_SOUND_ID
