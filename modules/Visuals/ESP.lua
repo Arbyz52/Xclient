@@ -5,71 +5,60 @@ local module = {
 }
 
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
 
--- Цветовая палитра
-local palette = {
-    [Enum.KeyCode.One]   = Color3.fromRGB(255, 70, 70),
-    [Enum.KeyCode.Two]   = Color3.fromRGB(255, 150, 0),
-    [Enum.KeyCode.Three] = Color3.fromRGB(255, 230, 0),
-    [Enum.KeyCode.Four]  = Color3.fromRGB(0, 200, 0),
-    [Enum.KeyCode.Five]  = Color3.fromRGB(0, 190, 255),
-    [Enum.KeyCode.Six]   = Color3.fromRGB(85, 110, 255),
-    [Enum.KeyCode.Seven] = Color3.fromRGB(170, 0, 255),
-    [Enum.KeyCode.Eight] = Color3.fromRGB(255, 0, 200),
-    [Enum.KeyCode.Nine]  = Color3.fromRGB(255, 255, 255),
-}
+-- Настройки ESP
+local ESP_COLOR = Color3.fromRGB(255, 0, 0)
+local FILL_TRANSPARENCY = 0.5
+local OUTLINE_TRANSPARENCY = 0
+local DEPTH_MODE = Enum.HighlightDepthMode.AlwaysOnTop
 
--- Настройки
-module._tintColor = palette[Enum.KeyCode.Five]
+-- Хранилище ESP-объектов
 module._esp = {}
-module._connection = nil
+module._connections = {}
 
--- Создание ESP
-local function addESP(player)
-    if player == Players.LocalPlayer then return end
-    if not player.Character then return end
+-- Создание ESP для игрока
+local function createESP(player)
+    if player == LocalPlayer then return end
     if module._esp[player] then return end
+    if not player.Character then return end
 
     local hl = Instance.new("Highlight")
     hl.Adornee = player.Character
-    hl.FillTransparency = 0.5
-    hl.OutlineColor = module._tintColor
-    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.FillColor = ESP_COLOR
+    hl.OutlineColor = ESP_COLOR
+    hl.FillTransparency = FILL_TRANSPARENCY
+    hl.OutlineTransparency = OUTLINE_TRANSPARENCY
+    hl.DepthMode = DEPTH_MODE
     hl.Parent = player.Character
 
     module._esp[player] = hl
 
-    player.CharacterAdded:Connect(function(char)
+    -- Перепривязка при респавне
+    local conn = player.CharacterAdded:Connect(function(char)
         hl.Adornee = char
         hl.Parent = char
     end)
+    module._connections[player] = conn
 end
 
 -- Удаление ESP
 local function removeESP(player)
-    local hl = module._esp[player]
-    if hl then
-        hl:Destroy()
+    if module._esp[player] then
+        module._esp[player]:Destroy()
         module._esp[player] = nil
     end
-end
-
--- Обновление цвета
-function module:RetintAll(color)
-    for _, hl in pairs(self._esp) do
-        if hl and hl.Parent then
-            hl.OutlineColor = color
-        end
+    if module._connections[player] then
+        module._connections[player]:Disconnect()
+        module._connections[player] = nil
     end
 end
 
--- Сброс ESP
+-- Сброс всех ESP
 function module:ResetAll()
-    for _, hl in pairs(self._esp) do
-        if hl then hl:Destroy() end
+    for player, _ in pairs(module._esp) do
+        removeESP(player)
     end
-    self._esp = {}
 end
 
 -- Инициализация
@@ -79,53 +68,41 @@ end
 
 -- Включение
 function module:OnEnable()
-    print("[ESP] Enabled!")
+    print("[ESP] Enabled")
     self.Enabled = true
 
-    for _, plr in ipairs(Players:GetPlayers()) do
-        addESP(plr)
+    for _, player in ipairs(Players:GetPlayers()) do
+        createESP(player)
     end
 
-    Players.PlayerAdded:Connect(function(plr)
-        plr.CharacterAdded:Connect(function()
-            addESP(plr)
+    module._connections["PlayerAdded"] = Players.PlayerAdded:Connect(function(player)
+        player.CharacterAdded:Connect(function()
+            createESP(player)
         end)
     end)
 
-    Players.PlayerRemoving:Connect(function(plr)
-        removeESP(plr)
-    end)
-
-    self._connection = UserInputService.InputBegan:Connect(function(input, gp)
-        if gp then return end
-        if not self.Enabled then return end
-
-        local newColor = palette[input.KeyCode]
-        if newColor then
-            self._tintColor = newColor
-            self:RetintAll(newColor)
-            print("[ESP] Color changed")
-        elseif input.KeyCode == Enum.KeyCode.T then
-            self:ResetAll()
-            print("[ESP] Reset all")
-        end
+    module._connections["PlayerRemoving"] = Players.PlayerRemoving:Connect(function(player)
+        removeESP(player)
     end)
 end
 
 -- Выключение
 function module:OnDisable()
-    print("[ESP] Disabled!")
+    print("[ESP] Disabled")
     self.Enabled = false
-
-    if self._connection then
-        self._connection:Disconnect()
-        self._connection = nil
-    end
-
     self:ResetAll()
+
+    if module._connections["PlayerAdded"] then
+        module._connections["PlayerAdded"]:Disconnect()
+        module._connections["PlayerAdded"] = nil
+    end
+    if module._connections["PlayerRemoving"] then
+        module._connections["PlayerRemoving"]:Disconnect()
+        module._connections["PlayerRemoving"] = nil
+    end
 end
 
--- Тик (не используется)
+-- Не используется
 function module:OnTick(dt)
 end
 
