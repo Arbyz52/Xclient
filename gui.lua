@@ -7,6 +7,7 @@ function Gui.Init(ModuleManager)
     local CoreGui          = game:GetService("CoreGui")
     local Players          = game:GetService("Players")
     local RunService       = game:GetService("RunService")
+    local Workspace        = game:GetService("Workspace")
 
     local localPlayer = Players.LocalPlayer
 
@@ -236,12 +237,12 @@ function Gui.Init(ModuleManager)
     searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
 
     ---------------------------------------------------
-    -- Курсор и RightShift
+    -- Курсор + камера, RightShift
     ---------------------------------------------------
     local menuOpen = false
     local prevMouseBehavior = UserInputService.MouseBehavior
     local prevMouseIcon     = UserInputService.MouseIconEnabled
-    local cursorConn        = nil
+    local prevCamType, prevCamSubject
 
     local function setMenuOpen(state)
         if menuOpen == state then return end
@@ -249,28 +250,36 @@ function Gui.Init(ModuleManager)
         screenGui.Enabled   = state
         searchFrame.Visible = state
 
+        local camera = Workspace.CurrentCamera
+
         if state then
+            -- сохраняем старые значения
             prevMouseBehavior = UserInputService.MouseBehavior
             prevMouseIcon     = UserInputService.MouseIconEnabled
 
+            if camera then
+                prevCamType    = camera.CameraType
+                prevCamSubject = camera.CameraSubject
+                camera.CameraType = Enum.CameraType.Scriptable
+            end
+
             UserInputService.MouseIconEnabled = true
             UserInputService.MouseBehavior    = Enum.MouseBehavior.Default
-
-            -- каждый кадр удерживаем мышь в Default,
-            -- чтобы игра не перехватывала её обратно
-            cursorConn = RunService.RenderStepped:Connect(function()
-                if UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default then
-                    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+        else
+            local okCam, errCam = pcall(function()
+                if camera then
+                    camera.CameraType   = prevCamType or Enum.CameraType.Custom
+                    if prevCamSubject then
+                        camera.CameraSubject = prevCamSubject
+                    end
                 end
             end)
-        else
-            if cursorConn then
-                cursorConn:Disconnect()
-                cursorConn = nil
+            if not okCam then
+                warn("[Xclient] Ошибка восстановления камеры:", errCam)
             end
 
             pcall(function()
-                UserInputService.MouseBehavior    = prevMouseBehavior
+                UserInputService.MouseBehavior    = prevMouseBehavior or Enum.MouseBehavior.LockCenter
                 UserInputService.MouseIconEnabled = prevMouseIcon
             end)
         end
