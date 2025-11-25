@@ -6,16 +6,10 @@ local module = {
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
 
--- Настройки ESP
-local ESP_COLOR = Color3.fromRGB(255, 0, 0)
-local FILL_TRANSPARENCY = 0.5
-local OUTLINE_TRANSPARENCY = 0
-local DEPTH_MODE = Enum.HighlightDepthMode.AlwaysOnTop
-
--- Хранилище ESP-объектов
-module._esp = {}
-module._connections = {}
+module._esp = {}          -- [player] = {highlight = ..., hpGui = ..., hpBar = ..., humanoid = ...}
+module._connections = {}  -- [player] = connection
 
 -- Создание ESP для игрока
 local function createESP(player)
@@ -23,29 +17,77 @@ local function createESP(player)
     if module._esp[player] then return end
     if not player.Character then return end
 
+    local char = player.Character
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return end
+
+    -- Highlight
     local hl = Instance.new("Highlight")
-    hl.Adornee = player.Character
-    hl.FillColor = ESP_COLOR
-    hl.OutlineColor = ESP_COLOR
-    hl.FillTransparency = FILL_TRANSPARENCY
-    hl.OutlineTransparency = OUTLINE_TRANSPARENCY
-    hl.DepthMode = DEPTH_MODE
-    hl.Parent = player.Character
+    hl.Adornee = char
+    hl.FillTransparency = 0.5
+    hl.OutlineColor = Color3.fromRGB(255, 0, 0)
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent = char
 
-    module._esp[player] = hl
+    -- BillboardGui для HP
+    local gui = Instance.new("BillboardGui")
+    gui.Name = "HPBar"
+    gui.Adornee = hrp
+    gui.Size = UDim2.new(4, 0, 0.5, 0)
+    gui.StudsOffset = Vector3.new(0, 3, 0)
+    gui.AlwaysOnTop = true
+    gui.Parent = char
 
-    -- Перепривязка при респавне
-    local conn = player.CharacterAdded:Connect(function(char)
-        hl.Adornee = char
-        hl.Parent = char
+    -- Фон
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    bg.BackgroundTransparency = 0.3
+    bg.BorderSizePixel = 0
+    bg.Parent = gui
+
+    -- Скругление фона
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = bg
+
+    -- HP-полоса
+    local bar = Instance.new("Frame")
+    bar.Name = "HP"
+    bar.Size = UDim2.new(1, 0, 1, 0)
+    bar.Position = UDim2.new(0, 0, 0, 0)
+    bar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    bar.BorderSizePixel = 0
+    bar.ZIndex = 2
+    bar.Parent = bg
+
+    -- Скругление полосы
+    local corner2 = Instance.new("UICorner")
+    corner2.CornerRadius = UDim.new(0, 6)
+    corner2.Parent = bar
+
+    module._esp[player] = {
+        highlight = hl,
+        hpGui = gui,
+        hpBar = bar,
+        humanoid = hum
+    }
+
+    -- Обновление при респавне
+    local conn = player.CharacterAdded:Connect(function()
+        removeESP(player)
+        createESP(player)
     end)
     module._connections[player] = conn
 end
 
 -- Удаление ESP
-local function removeESP(player)
-    if module._esp[player] then
-        module._esp[player]:Destroy()
+function removeESP(player)
+    local data = module._esp[player]
+    if data then
+        if data.highlight then data.highlight:Destroy() end
+        if data.hpGui then data.hpGui:Destroy() end
         module._esp[player] = nil
     end
     if module._connections[player] then
@@ -56,7 +98,7 @@ end
 
 -- Сброс всех ESP
 function module:ResetAll()
-    for player, _ in pairs(module._esp) do
+    for player in pairs(module._esp) do
         removeESP(player)
     end
 end
@@ -84,6 +126,18 @@ function module:OnEnable()
     module._connections["PlayerRemoving"] = Players.PlayerRemoving:Connect(function(player)
         removeESP(player)
     end)
+
+    module._connections["Render"] = RunService.RenderStepped:Connect(function()
+        for _, data in pairs(module._esp) do
+            local hum = data.humanoid
+            local bar = data.hpBar
+            if hum and bar then
+                local ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                bar.Size = UDim2.new(ratio, 0, 1, 0)
+                bar.BackgroundColor3 = Color3.fromRGB(255 - ratio * 255, ratio * 255, 0)
+            end
+        end
+    end)
 end
 
 -- Выключение
@@ -92,14 +146,10 @@ function module:OnDisable()
     self.Enabled = false
     self:ResetAll()
 
-    if module._connections["PlayerAdded"] then
-        module._connections["PlayerAdded"]:Disconnect()
-        module._connections["PlayerAdded"] = nil
+    for _, conn in pairs(module._connections) do
+        if conn then conn:Disconnect() end
     end
-    if module._connections["PlayerRemoving"] then
-        module._connections["PlayerRemoving"]:Disconnect()
-        module._connections["PlayerRemoving"] = nil
-    end
+    module._connections = {}
 end
 
 -- Не используется
