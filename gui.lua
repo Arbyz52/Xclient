@@ -6,22 +6,22 @@ function Gui.Init(ModuleManager)
     local UserInputService = game:GetService("UserInputService")
     local CoreGui          = game:GetService("CoreGui")
     local TweenService     = game:GetService("TweenService")
-    local SoundService     = game:GetService("SoundService")
+    local Debris           = game:GetService("Debris")
+    local Workspace        = game:GetService("Workspace")
 
     ---------------------------------------------------
     -- Звук переключения
     ---------------------------------------------------
-    local TOGGLE_SOUND_ID = "rbxassetid://87437544236708"
-
-    local toggleSound = Instance.new("Sound")
-    toggleSound.SoundId = TOGGLE_SOUND_ID
-    toggleSound.Volume = 0.5
-    toggleSound.Name = "XclientToggle"
-    toggleSound.Parent = SoundService
+    local TOGGLE_SOUND_ID = "rbxassetid://87437544236708" -- твой звук
 
     local function playToggle()
-        toggleSound.TimePosition = 0
-        toggleSound:Play()
+        local s = Instance.new("Sound")
+        s.SoundId = TOGGLE_SOUND_ID
+        s.Volume = 0.7
+        s.RollOffMaxDistance = 10000
+        s.Parent = Workspace
+        s:Play()
+        Debris:AddItem(s, 3)
     end
 
     ---------------------------------------------------
@@ -278,8 +278,6 @@ function Gui.Init(ModuleManager)
         TweenService:Create(searchFrame, info, {Position = UDim2.new(0.5, -160, 0.5, 240)}):Play()
     end
 
-    privateMenuOpen = menuOpen
-
     local function playCloseAnim()
         local info = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
         local t1 = TweenService:Create(mainFrame,  info, {Position = UDim2.new(0.5, -550, 0.5, -260)})
@@ -306,14 +304,13 @@ function Gui.Init(ModuleManager)
     end
 
     ---------------------------------------------------
-    -- Управление (только RightShift + поиск)
+    -- Управление
     ---------------------------------------------------
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
 
         local focused = UserInputService:GetFocusedTextBox()
         if focused and focused == searchBox then
-            -- когда вводим текст в поиск, ничего больше не делаем
             return
         end
 
