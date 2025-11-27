@@ -47,6 +47,7 @@ local MAX_SHOW_DISTANCE = 120
 
 local function createNameTag(player, character)
     if not character then return end
+    if not player or not player:IsDescendantOf(Players) then return end
 
     -- ищем голову или любую деталь
     local head = character:FindFirstChild("Head") or character:FindFirstChildWhichIsA("BasePart")
@@ -77,7 +78,7 @@ local function createNameTag(player, character)
     billboard.MaxDistance = MAX_SHOW_DISTANCE + 20
     billboard.ResetOnSpawn = false
 
-    -- без фона, только текст
+    -- основной текст
     local text = Instance.new("TextLabel")
     text.Name = "NameText"
     text.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -85,15 +86,35 @@ local function createNameTag(player, character)
     text.Size = UDim2.new(1, -10, 1, -6)
     text.BackgroundTransparency = 1
 
-    text.Text = player.DisplayName ~= "" and player.DisplayName or player.Name
+    -- гарантированно берём ник именно этого player
+    local display = player.DisplayName
+    if type(display) ~= "string" or display == "" then
+        display = player.Name
+    end
+    text.Text = display
+
     text.Font = Enum.Font.GothamBold
     text.TextScaled = false
-    text.TextSize = 12             -- меньше шрифт
+    text.TextSize = 12
     text.TextColor3 = Color3.fromRGB(255, 255, 255)
     text.TextStrokeTransparency = 0.2
     text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-
     text.Parent = billboard
+
+    -- маленький дебаг‑текст снизу (UserId), можно потом удалить
+    local debugText = Instance.new("TextLabel")
+    debugText.Name = "DebugUserId"
+    debugText.AnchorPoint = Vector2.new(0.5, 1)
+    debugText.Position = UDim2.new(0.5, 0, 1, 0)
+    debugText.Size = UDim2.new(1, -10, 0, 10)
+    debugText.BackgroundTransparency = 1
+    debugText.Text = tostring(player.UserId)
+    debugText.Font = Enum.Font.Code
+    debugText.TextSize = 8
+    debugText.TextColor3 = Color3.fromRGB(0, 255, 0)
+    debugText.TextStrokeTransparency = 1
+    debugText.Parent = billboard
+
     billboard.Parent = character
 
     local root = character:FindFirstChild("HumanoidRootPart") or head
@@ -101,6 +122,7 @@ local function createNameTag(player, character)
     module._data[player] = {
         billboard = billboard,
         textLabel = text,
+        dbgLabel  = debugText,
         character = character,
         rootPart  = root,
     }
@@ -116,11 +138,13 @@ local function updateAll()
         local text = info.textLabel
         local root = info.rootPart
 
-        if not text or not root or not lpRoot then
+        if not player or not player:IsDescendantOf(Players) then
+            -- игрок вышел / объект невалидный
+            destroyPlayerData(player)
+        elseif not text or not root or not lpRoot then
             if text then text.Visible = false end
         else
             local dist = (lpRoot.Position - root.Position).Magnitude
-            -- резкий порог
             text.Visible = dist <= MAX_SHOW_DISTANCE
         end
     end
