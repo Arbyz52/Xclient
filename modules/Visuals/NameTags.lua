@@ -3,7 +3,7 @@ local module = {
     Category = "Visuals",
     Enabled  = false,
 
-    _data        = {},   -- [player] = {billboard, textLabel, character, rootPart}
+    _data        = {},   -- [player] = {billboard, textLabel, character, rootPart, humanoid}
     _connections = {},
 }
 
@@ -49,6 +49,20 @@ local function createNameTag(player, character)
     if not character then return end
     if not player or not player:IsDescendantOf(Players) then return end
 
+    local hum = character:FindFirstChildOfClass("Humanoid")
+    if not hum then
+        -- ждём появление Humanoid
+        local key = "HumWait_" .. player.UserId
+        addConnection(key, character.ChildAdded:Connect(function(child)
+            if child:IsA("Humanoid") then
+                disconnect(module._connections[key])
+                module._connections[key] = nil
+                createNameTag(player, character)
+            end
+        end))
+        return
+    end
+
     -- ищем голову или любую деталь
     local head = character:FindFirstChild("Head") or character:FindFirstChildWhichIsA("BasePart")
     if not head then
@@ -78,7 +92,7 @@ local function createNameTag(player, character)
     billboard.MaxDistance = MAX_SHOW_DISTANCE + 20
     billboard.ResetOnSpawn = false
 
-    -- основной текст
+    -- только текст, без фона и дебага
     local text = Instance.new("TextLabel")
     text.Name = "NameText"
     text.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -86,7 +100,7 @@ local function createNameTag(player, character)
     text.Size = UDim2.new(1, -10, 1, -6)
     text.BackgroundTransparency = 1
 
-    -- гарантированно берём ник именно этого player
+    -- ник строго из Player (как в табе)
     local display = player.DisplayName
     if type(display) ~= "string" or display == "" then
         display = player.Name
@@ -99,22 +113,8 @@ local function createNameTag(player, character)
     text.TextColor3 = Color3.fromRGB(255, 255, 255)
     text.TextStrokeTransparency = 0.2
     text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+
     text.Parent = billboard
-
-    -- маленький дебаг‑текст снизу (UserId), можно потом удалить
-    local debugText = Instance.new("TextLabel")
-    debugText.Name = "DebugUserId"
-    debugText.AnchorPoint = Vector2.new(0.5, 1)
-    debugText.Position = UDim2.new(0.5, 0, 1, 0)
-    debugText.Size = UDim2.new(1, -10, 0, 10)
-    debugText.BackgroundTransparency = 1
-    debugText.Text = tostring(player.UserId)
-    debugText.Font = Enum.Font.Code
-    debugText.TextSize = 8
-    debugText.TextColor3 = Color3.fromRGB(0, 255, 0)
-    debugText.TextStrokeTransparency = 1
-    debugText.Parent = billboard
-
     billboard.Parent = character
 
     local root = character:FindFirstChild("HumanoidRootPart") or head
@@ -122,9 +122,9 @@ local function createNameTag(player, character)
     module._data[player] = {
         billboard = billboard,
         textLabel = text,
-        dbgLabel  = debugText,
         character = character,
         rootPart  = root,
+        humanoid  = hum,
     }
 end
 
@@ -137,14 +137,21 @@ local function updateAll()
     for player, info in pairs(module._data) do
         local text = info.textLabel
         local root = info.rootPart
+        local hum  = info.humanoid
 
+        -- игрок вышел или объект невалидный
         if not player or not player:IsDescendantOf(Players) then
-            -- игрок вышел / объект невалидный
             destroyPlayerData(player)
+
+        -- если персонаж умер / нет гуманоидa -> сразу убираем
+        elseif not hum or hum.Health <= 0 then
+            destroyPlayerData(player)
+
         elseif not text or not root or not lpRoot then
             if text then text.Visible = false end
         else
             local dist = (lpRoot.Position - root.Position).Magnitude
+            -- резкий порог
             text.Visible = dist <= MAX_SHOW_DISTANCE
         end
     end
@@ -153,12 +160,15 @@ end
 -- ========= ОБРАБОТКА ИГРОКОВ =========
 
 local function onCharacterAdded(player, character)
+    -- своих вообще не трогаем
     if player == LocalPlayer then return end
+
     destroyPlayerData(player)
     createNameTag(player, character)
 end
 
 local function onPlayerAdded(player)
+    -- своих не трогаем
     if player == LocalPlayer then return end
 
     if player.Character then
