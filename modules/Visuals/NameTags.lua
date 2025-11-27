@@ -56,18 +56,19 @@ local function destroyPlayerData(player)
 end
 
 -- ========= ЛОГИКА КОМАНД =========
--- Неймтеги только на врагах, локального игрока не трогаем
 
 local function isEnemy(player)
+    -- не трогаем локального
     if player == LocalPlayer then
         return false
     end
 
-    -- если у игры нет команд, то все, кроме LocalPlayer, считаются врагами
+    -- если в игре НЕТ команд – все, кроме LocalPlayer, считаются врагами
     if not LocalPlayer.Team or not player.Team then
         return player ~= LocalPlayer
     end
 
+    -- если команды есть – враг тот, чья команда не совпадает
     return player.Team ~= LocalPlayer.Team
 end
 
@@ -97,12 +98,19 @@ end
 local function createNameTag(player, character, humanoid, startColor)
     if not character then return end
 
+    -- распечатаем, чтобы убедиться, что функция вообще вызывается
+    -- print("[NameTags] createNameTag for", player.Name)
+
+    -- подстраховка: для R6/R15 и кастомов
     local head = character:FindFirstChild("Head")
         or character:FindFirstChild("UpperTorso")
         or character:FindFirstChild("Torso")
         or character:FindFirstChildWhichIsA("BasePart")
 
-    if not head then return end
+    if not head then
+        -- print("[NameTags] no head/basepart for", player.Name)
+        return
+    end
 
     local tagGui = Instance.new("BillboardGui")
     tagGui.Name = "ESP_NameTag"
@@ -138,6 +146,12 @@ end
 local function setupCharacter(player, character)
     if not character then return end
 
+    -- если это не враг – вообще ничего не делаем
+    if not isEnemy(player) then
+        destroyPlayerData(player)
+        return
+    end
+
     local hum = character:FindFirstChildOfClass("Humanoid")
     if not hum then
         local key = "HumWait_" .. player.UserId
@@ -157,6 +171,9 @@ local function setupCharacter(player, character)
     local col = getHealthColor(ratio)
 
     local tagGui, tagLabel = createNameTag(player, character, hum, col)
+    if not tagGui or not tagLabel then
+        return
+    end
 
     module._data[player] = {
         humanoid     = hum,
@@ -171,13 +188,11 @@ end
 local function trackTeamChange(player)
     local key = "TeamChanged_" .. player.UserId
     addConnection(key, player:GetPropertyChangedSignal("Team"):Connect(function()
-        -- если стал тиммейтом – убираем неймтаг
         if not isEnemy(player) then
             destroyPlayerData(player)
             return
         end
 
-        -- если стал врагом – вешаем неймтаг, если есть персонаж
         if player.Character then
             destroyPlayerData(player)
             setupCharacter(player, player.Character)
