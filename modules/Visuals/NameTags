@@ -3,7 +3,7 @@ local module = {
     Category = "Visuals",
     Enabled  = false,
 
-    _data        = {},   -- [player] = { character, head, billboard }
+    _data        = {},   -- [player] = {billboard, textLabel}
     _connections = {},
 }
 
@@ -29,115 +29,147 @@ local function addConnection(key, conn)
     end
 end
 
-local function destroyNameTag(player)
+local function destroyPlayerData(player)
     local info = module._data[player]
     if not info then return end
 
     if info.billboard then
-        pcall(function()
-            info.billboard:Destroy()
-        end)
+        pcall(function() info.billboard:Destroy() end)
     end
 
     module._data[player] = nil
 end
 
--- ========= СОЗДАНИЕ НЕЙМТАГА =========
+-- ========= ЛОГИКА КОМАНД (как в ESP, только враги; если нужно для всех — убери isEnemy) =========
 
-local function createNameTag(player)
-    local character = player.Character
+local function isEnemy(player)
+    if player == LocalPlayer then
+        return false
+    end
+
+    -- если у игры нет команд, то все, кроме LocalPlayer, считаются врагами
+    if not LocalPlayer.Team or not player.Team then
+        return player ~= LocalPlayer
+    end
+
+    return player.Team ~= LocalPlayer.Team
+end
+
+-- ========= СОЗДАНИЕ NAME TAG =========
+
+local function createNameTag(player, character)
     if not character then return end
 
-    local head = character:FindFirstChild("Head")
+    -- ищем голову
+    local head = character:FindFirstChild("Head") or character:FindFirstChildWhichIsA("BasePart")
     if not head then
-        -- если головы ещё нет, ждём её появления
         local key = "HeadWait_" .. player.UserId
         addConnection(key, character.ChildAdded:Connect(function(child)
-            if child.Name == "Head" then
+            if child.Name == "Head" or child:IsA("BasePart") then
                 disconnect(module._connections[key])
                 module._connections[key] = nil
-                createNameTag(player)
+                createNameTag(player, character)
             end
         end))
         return
     end
 
-    -- Удаляем старый неймтаг, если был
-    local old = head:FindFirstChild("NameTag")
+    -- удаляем старый тег, если есть
+    local old = character:FindFirstChild("NameTag")
     if old then
-        old:Destroy()
+        pcall(function() old:Destroy() end)
     end
 
-    -- BillboardGui над головой
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "NameTag"
     billboard.Adornee = head
     billboard.Size = UDim2.new(0, 200, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, 2.5, 0) -- чуть выше головы
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = true
-    billboard.MaxDistance = 150 -- можно изменить или убрать
+    billboard.MaxDistance = 200
+    billboard.ResetOnSpawn = false
 
-    billboard.Parent = head
-
-    -- Фон
     local bg = Instance.new("Frame")
+    bg.Name = "Background"
+    bg.BackgroundTransparency = 0.2
     bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    bg.BackgroundTransparency = 0.4
     bg.Size = UDim2.new(1, 0, 1, 0)
     bg.BorderSizePixel = 0
     bg.Parent = billboard
 
-    -- Текст с ником
-    local label = Instance.new("TextLabel")
-    label.BackgroundTransparency = 1
-    label.Size = UDim2.new(1, -8, 1, -8)
-    label.Position = UDim2.new(0, 4, 0, 4)
-    label.Text = player.Name
-    label.TextScaled = true
+    local text = Instance.new("TextLabel")
+    text.Name = "NameText"
+    text.AnchorPoint = Vector2.new(0.5, 0.5)
+    text.Position = UDim2.new(0.5, 0, 0.5, 0)
+    text.Size = UDim2.new(1, -10, 1, -10)
+    text.BackgroundTransparency = 1
 
-    -- Красивый шрифт
-    label.Font = Enum.Font.FredokaOne
-    -- можешь попробовать другие:
-    -- Enum.Font.GothamBold, Enum.Font.LuckiestGuy, Enum.Font.SourceSansBold
+    text.Text = player.DisplayName ~= "" and player.DisplayName or player.Name
+    text.Font = Enum.Font.GothamBold      -- можно сменить на любой
+    text.TextScaled = true
+    text.TextColor3 = Color3.fromRGB(255, 255, 255)
+    text.TextStrokeTransparency = 0.2
+    text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.TextStrokeTransparency = 0
-    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    label.Parent = bg
+    text.Parent = bg
+    billboard.Parent = character
 
     module._data[player] = {
-        character = character,
-        head      = head,
         billboard = billboard,
+        textLabel = text,
     }
 end
 
--- ========= РЕАКЦИЯ НА СПАВН / ЛИВ =========
+-- ========= НАСТРОЙКА ЧАРА / КОМАНД =========
 
-local function onCharacterAdded(player, character)
-    -- если хочешь НЕ показывать неймтаг над собой, раскомментируй:
-    -- if player == LocalPlayer then return end
+local function setupCharacter(player, character)
+    if not isEnemy(player) then
+        destroyPlayerData(player)
+        return
+    end
 
-    destroyNameTag(player)
-    createNameTag(player)
+    destroyPlayerData(player)
+    createNameTag(player, character)
+end
+
+local function trackTeamChange(player)
+    local key = "TeamChanged_" .. player.UserId
+    addConnection(key, player:GetPropertyChangedSignal("Team"):Connect(function()
+        if not isEnemy(player) then
+            destroyPlayerData(player)
+            return
+        end
+
+        if player.Character then
+            setupCharacter(player, player.Character)
+        end
+    end))
 end
 
 local function onPlayerAdded(player)
-    -- если хочешь не делать тэг над собой:
-    -- if player == LocalPlayer then return end
-
-    if player.Character then
-        createNameTag(player)
+    -- не трогаем локального игрока
+    if player == LocalPlayer then
+        return
     end
 
-    local key = "CharAdded_" .. player.UserId
-    addConnection(key, player.CharacterAdded:Connect(function(char)
-        onCharacterAdded(player, char)
+    trackTeamChange(player)
+
+    if not isEnemy(player) then
+        return
+    end
+
+    if player.Character then
+        setupCharacter(player, player.Character)
+    end
+
+    local key = "Respawn_" .. player.UserId
+    addConnection(key, player.CharacterAdded:Connect(function(newChar)
+        setupCharacter(player, newChar)
     end))
 end
 
 local function onPlayerRemoving(player)
-    destroyNameTag(player)
+    destroyPlayerData(player)
 end
 
 -- ========= МОДУЛЬНЫЕ МЕТОДЫ =========
@@ -162,17 +194,11 @@ end
 function module:OnDisable()
     self.Enabled = false
 
-    -- удаляем все неймтаги
-    for plr, info in pairs(self._data) do
-        if info.billboard then
-            pcall(function()
-                info.billboard:Destroy()
-            end)
-        end
+    for plr, _ in pairs(self._data) do
+        destroyPlayerData(plr)
     end
     self._data = {}
 
-    -- отключаем все коннекты
     for key, conn in pairs(self._connections) do
         disconnect(conn)
         self._connections[key] = nil
@@ -180,7 +206,6 @@ function module:OnDisable()
 end
 
 function module:OnTick(dt)
-    -- здесь ничего не нужно, неймтаги статичные
 end
 
-return 
+return module
