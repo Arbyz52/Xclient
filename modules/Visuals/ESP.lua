@@ -2,22 +2,25 @@ local module = {
     Name = "ESP",
     Category = "Visuals",
     Enabled = false,
-    _data = {}, -- [player] = {humanoid, character, highlight, lastColor}
-    _connections = {},
+    _data = {},        -- [player] = {humanoid, character, highlight, lastColor}
+    _connections = {}, -- [key or index] = connection
 }
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 
--- если игра точно использует команды — ставь true
--- если хочешь, чтобы без команд все, кроме тебя, были врагами — ставь false
+-- === НАСТРОЙКА ===
+-- true  = игра точно использует Teams (Team у игроков обновляется)
+-- false = игра без команд, все, кроме LocalPlayer, считаются врагами
 local USE_TEAMS = true
 
 -- ========= УТИЛИТЫ =========
 
 local function disconnect(conn)
-    if conn then pcall(function() conn:Disconnect() end) end
+    if conn then
+        pcall(function() conn:Disconnect() end)
+    end
 end
 
 local function addConnection(key, conn)
@@ -48,30 +51,36 @@ end
 local function destroyPlayerData(player)
     local info = module._data[player]
     if not info then return end
+
     if info.highlight then
         pcall(function() info.highlight:Destroy() end)
     end
+
     module._data[player] = nil
 end
 
 -- ========= ЛОГИКА КОМАНД =========
--- Подсвечиваем только врагов, себя НЕ трогаем
 
 local function isEnemy(player)
-    if player == LocalPlayer then return false end
-
-    if USE_TEAMS then
-        -- Игра использует команды:
-        -- пока у кого-то из нас Team == nil — считаем НЕ врагом,
-        -- чтобы не было глюков при смене команды.
-        if LocalPlayer.Team == nil or player.Team == nil then
-            return false
-        end
-        return player.Team ~= LocalPlayer.Team
-    else
-        -- Игра без команд — все, кроме LocalPlayer, враги
-        return player ~= LocalPlayer
+    if player == LocalPlayer then
+        return false
     end
+
+    if not USE_TEAMS then
+        -- Игра без команд — все, кроме тебя, враги
+        return true
+    end
+
+    -- Игра с командами:
+    -- если у кого-то Team ещё nil — ничего не знаем, считаем НЕ врагом
+    local myTeam = LocalPlayer.Team
+    local theirTeam = player.Team
+
+    if myTeam == nil or theirTeam == nil then
+        return false
+    end
+
+    return theirTeam ~= myTeam
 end
 
 -- Цвет по HP: 1 = зелёный, 0.5 = жёлтый, 0 = красный
@@ -99,7 +108,7 @@ end
 local function setupCharacter(player, character)
     if not character then return end
 
-    -- если уже не враг — не вешаем ESP
+    -- если уже не враг — на всякий случай очистить и выйти
     if not isEnemy(player) then
         destroyPlayerData(player)
         return
@@ -107,13 +116,17 @@ local function setupCharacter(player, character)
 
     local hum = character:FindFirstChildOfClass("Humanoid")
     if not hum then
-        -- ждём Humanoid, если его ещё нет
+        -- Ждём появление Humanoid
         local key = "HumWait_" .. player.UserId
         addConnection(key, character.ChildAdded:Connect(function(child)
             if child:IsA("Humanoid") then
                 disconnect(module._connections[key])
                 module._connections[key] = nil
-                setupCharacter(player, character)
+                -- небольшой defer, чтобы всё успело проинициализироваться
+                task.defer(function()
+                    if not module.Enabled then return end
+                    setupCharacter(player, character)
+                end)
             end
         end))
         return
@@ -121,20 +134,19 @@ local function setupCharacter(player, character)
 
     disableDefaultHp(hum)
 
-    -- создаём Highlight
+    -- Удаляем старый ESP, если вдруг был
+    destroyPlayerData(player)
+
     local hl = Instance.new("Highlight")
     hl.Name = "ESP_Highlight"
     hl.Adornee = character
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    -- только контур, без заливки модели
     hl.FillTransparency = 1
     hl.OutlineTransparency = 0
 
-    -- базовый цвет по хп
     local ratio = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
     local col = getHealthColor(ratio)
     hl.OutlineColor = col
-
     hl.Parent = character
 
     module._data[player] = {
@@ -145,55 +157,60 @@ local function setupCharacter(player, character)
     }
 end
 
--- слежение за сменой команды
+-- ========= СЛЕЖЕНИЕ ЗА КОМАНДОЙ =========
+
 local function trackTeamChange(player)
     local key = "TeamChanged_" .. player.UserId
     addConnection(key, player:GetPropertyChangedSignal("Team"):Connect(function()
-        -- откладываем обработку, чтобы Roblox успел обновить обе команды
         task.defer(function()
             if not module.Enabled then return end
 
-            -- если стал тиммейтом – убираем ESP
+            -- если игрок стал тиммейтом — убираем ESP
             if not isEnemy(player) then
                 destroyPlayerData(player)
                 return
             end
 
-            -- если стал врагом – вешаем ESP, если есть персонаж
-            if player.Character then
-                destroyPlayerData(player)
-                setupCharacter(player, player.Character)
+            -- если стал врагом и есть персонаж — вешаем ESP
+            local character = player.Character
+            if character then
+                setupCharacter(player, character)
             end
         end)
     end))
 end
 
+-- ========= ОБРАБОТКА ИГРОКОВ =========
+
+local function onCharacterAdded(player, character)
+    -- При респавне/спавне
+    destroyPlayerData(player)
+
+    task.defer(function()
+        if not module.Enabled then return end
+
+        -- если враг — вешаем ESP
+        if isEnemy(player) then
+            setupCharacter(player, character)
+        else
+            destroyPlayerData(player)
+        end
+    end)
+end
+
 local function onPlayerAdded(player)
-    -- не трогаем локального игрока вообще
     if player == LocalPlayer then return end
 
-    -- слушаем смену команды
     trackTeamChange(player)
 
-    -- если это не враг (тиммейт/мы сами) — не создаём ESP
-    if not isEnemy(player) then return end
-
+    -- Обработка уже существующего персонажа
     if player.Character then
-        setupCharacter(player, player.Character)
+        onCharacterAdded(player, player.Character)
     end
 
     local key = "Respawn_" .. player.UserId
     addConnection(key, player.CharacterAdded:Connect(function(newChar)
-        destroyPlayerData(player)
-        -- небольшая задержка, чтобы Team успела обновиться при респавне
-        task.defer(function()
-            if not module.Enabled then return end
-            if isEnemy(player) then
-                setupCharacter(player, newChar)
-            else
-                destroyPlayerData(player)
-            end
-        end)
+        onCharacterAdded(player, newChar)
     end))
 end
 
@@ -209,7 +226,11 @@ local function updateAll(dt)
     for player, info in pairs(module._data) do
         local hum = info.humanoid
         local hl = info.highlight
-        if hum and hl and hum.MaxHealth > 0 then
+
+        -- если игрок перестал быть врагом (например, сменил команду), то чистим
+        if not isEnemy(player) then
+            destroyPlayerData(player)
+        elseif hum and hl and hum.Parent and hum.MaxHealth > 0 then
             local ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
             local targetColor = getHealthColor(ratio)
             local current = info.lastColor or targetColor
@@ -217,6 +238,9 @@ local function updateAll(dt)
             local newColor = current:Lerp(targetColor, alpha)
             hl.OutlineColor = newColor
             info.lastColor = newColor
+        else
+            -- humanoid/character/hl пропали — чистим
+            destroyPlayerData(player)
         end
     end
 end
@@ -231,7 +255,7 @@ end
 function module:OnEnable()
     self.Enabled = true
 
-    -- уже находящиеся игроки
+    -- обработать уже находящихся игроков
     for _, plr in ipairs(Players:GetPlayers()) do
         onPlayerAdded(plr)
     end
@@ -239,6 +263,7 @@ function module:OnEnable()
     addConnection("PlayerAdded", Players.PlayerAdded:Connect(onPlayerAdded))
     addConnection("PlayerRemoving", Players.PlayerRemoving:Connect(onPlayerRemoving))
     addConnection("RenderUpdate", RunService.RenderStepped:Connect(function(dt)
+        if not module.Enabled then return end
         updateAll(dt)
     end))
 end
@@ -262,6 +287,8 @@ function module:OnDisable()
     end
 end
 
-function module:OnTick(dt) end
+function module:OnTick(dt)
+    -- не используется
+end
 
 return module
