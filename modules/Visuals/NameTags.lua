@@ -28,23 +28,20 @@ local function addConnection(key, conn)
 end
 
 local function disableDefaultHp(humanoid)
-    if not humanoid then return end
-    pcall(function()
-        humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
-    end)
+    if humanoid then
+        pcall(function() humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff end)
+    end
 end
 
 local function restoreDefaultHp(humanoid)
-    if not humanoid then return end
-    pcall(function()
-        humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.DisplayWhenDamaged
-    end)
+    if humanoid then
+        pcall(function() humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.DisplayWhenDamaged end)
+    end
 end
 
 local function destroyPlayerData(player)
     local info = module._data[player]
     if not info then return end
-
     if info.nameTagGui then pcall(function() info.nameTagGui:Destroy() end) end
     module._data[player] = nil
 end
@@ -55,13 +52,10 @@ local function isEnemy(player)
     if player == LocalPlayer then return false end
     local lt = LocalPlayer.Team
     local pt = player.Team
-    if lt == nil or pt == nil then
-        return player ~= LocalPlayer
-    end
+    if lt == nil or pt == nil then return player ~= LocalPlayer end
     return lt ~= pt
 end
 
--- Цвет по HP: 1 = зелёный, 0.5 = жёлтый, 0 = красный
 local function getHealthColor(ratio)
     ratio = math.clamp(ratio, 0, 1)
     if ratio >= 0.5 then
@@ -75,16 +69,13 @@ local function getHealthColor(ratio)
     end
 end
 
--- ========= ФУНКЦИЯ СОЗДАНИЯ НЕЙМТАГА =========
+-- ========= СОЗДАНИЕ НЕЙМТАГА =========
 
 local function createNameTag(player, character, humanoid, startColor)
-    if not character then return end
-
     local head = character:FindFirstChild("Head")
         or character:FindFirstChild("UpperTorso")
         or character:FindFirstChild("Torso")
         or character:FindFirstChildWhichIsA("BasePart")
-
     if not head then return end
 
     local tagGui = Instance.new("BillboardGui")
@@ -93,7 +84,7 @@ local function createNameTag(player, character, humanoid, startColor)
     tagGui.AlwaysOnTop = true
     tagGui.Size = UDim2.new(0, 150, 0, 25)
     tagGui.StudsOffset = Vector3.new(0, 2.5, 0)
-    tagGui.MaxDistance = 0 -- без ограничения дистанции
+    tagGui.MaxDistance = 0
 
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
@@ -111,7 +102,7 @@ local function createNameTag(player, character, humanoid, startColor)
     label.Text = string.format("%s [%d/%d]", player.Name, hp, max)
 
     label.Parent = tagGui
-    tagGui.Parent = CoreGui -- ключевой фикс: BillboardGui должен быть в GUI-сервисе
+    tagGui.Parent = CoreGui
 
     return tagGui, label
 end
@@ -120,8 +111,6 @@ end
 
 local function setupCharacter(player, character)
     if not character then return end
-
-    -- фильтр врагов
     if not isEnemy(player) then
         destroyPlayerData(player)
         return
@@ -156,14 +145,16 @@ local function setupCharacter(player, character)
         lastColor    = col,
     }
 
-    -- Автоочистка при смерти, чтобы не висели теги
-    local diedKey = "Died_" .. player.UserId
-    addConnection(diedKey, hum.Died:Connect(function()
+    -- удаляем при смерти
+    addConnection("Died_" .. player.UserId, hum.Died:Connect(function()
         destroyPlayerData(player)
+    end))
+    -- удаляем при удалении модели
+    addConnection("CharRemoved_" .. player.UserId, character.AncestryChanged:Connect(function(_, parent)
+        if not parent then destroyPlayerData(player) end
     end))
 end
 
--- слежение за сменой команды
 local function trackTeamChange(player)
     local key = "TeamChanged_" .. player.UserId
     addConnection(key, player:GetPropertyChangedSignal("Team"):Connect(function()
@@ -176,13 +167,8 @@ end
 
 local function onPlayerAdded(player)
     if player == LocalPlayer then return end
-
     trackTeamChange(player)
-
-    if player.Character then
-        setupCharacter(player, player.Character)
-    end
-
+    if player.Character then setupCharacter(player, player.Character) end
     local key = "Respawn_" .. player.UserId
     addConnection(key, player.CharacterAdded:Connect(function(newChar)
         destroyPlayerData(player)
@@ -194,7 +180,7 @@ local function onPlayerRemoving(player)
     destroyPlayerData(player)
 end
 
--- ========= ОБНОВЛЕНИЕ ЦВЕТА И ТЕКСТА =========
+-- ========= ОБНОВЛЕНИЕ =========
 
 local LERP_SPEED = 10
 
@@ -202,7 +188,9 @@ local function updateAll(dt)
     for player, info in pairs(module._data) do
         local hum = info.humanoid
         local label = info.nameTagLabel
-        if hum and label and hum.MaxHealth > 0 then
+        if not hum or hum.Parent == nil then
+            destroyPlayerData(player)
+        elseif label and hum.MaxHealth > 0 then
             local ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
             local targetColor = getHealthColor(ratio)
 
@@ -216,6 +204,10 @@ local function updateAll(dt)
             local hp  = math.floor(hum.Health + 0.5)
             local max = math.floor(hum.MaxHealth + 0.5)
             label.Text = string.format("%s [%d/%d]", player.Name, hp, max)
+
+            if hum.Health <= 0 then
+                destroyPlayerData(player)
+            end
         end
     end
 end
@@ -229,11 +221,7 @@ end
 
 function module:OnEnable()
     self.Enabled = true
-
-    for _, plr in ipairs(Players:GetPlayers()) do
-        onPlayerAdded(plr)
-    end
-
+    for _, plr in ipairs(Players:GetPlayers()) do onPlayerAdded(plr) end
     addConnection("PlayerAdded",    Players.PlayerAdded:Connect(onPlayerAdded))
     addConnection("PlayerRemoving", Players.PlayerRemoving:Connect(onPlayerRemoving))
     addConnection("RenderUpdate",   RunService.RenderStepped:Connect(updateAll))
@@ -241,13 +229,11 @@ end
 
 function module:OnDisable()
     self.Enabled = false
-
     for _, info in pairs(self._data) do
         if info.humanoid then restoreDefaultHp(info.humanoid) end
         if info.nameTagGui then pcall(function() info.nameTagGui:Destroy() end) end
     end
     self._data = {}
-
     for key, conn in pairs(self._connections) do
         disconnect(conn)
         self._connections[key] = nil
