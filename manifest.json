@@ -11,6 +11,11 @@
       "name": "ESP"
     },
     {
+      "path": "modules/Visuals/NameTags.lua",
+      "category": "Visuals",
+      "name": "NameTags"
+    },
+    {
       "path": "modules/Movement/Fly.lua",
       "category": "Movement",
       "name": "Fly"
