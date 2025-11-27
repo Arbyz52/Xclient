@@ -149,6 +149,7 @@ local function setupCharacter(player, character)
     addConnection("Died_" .. player.UserId, hum.Died:Connect(function()
         destroyPlayerData(player)
     end))
+
     -- удаляем при удалении модели
     addConnection("CharRemoved_" .. player.UserId, character.AncestryChanged:Connect(function(_, parent)
         if not parent then destroyPlayerData(player) end
@@ -188,7 +189,10 @@ local function updateAll(dt)
     for player, info in pairs(module._data) do
         local hum = info.humanoid
         local label = info.nameTagLabel
-        if not hum or hum.Parent == nil then
+        local char = info.character
+
+        -- если персонаж удалён или здоровье <= 0
+        if not hum or hum.Parent == nil or not char or char.Parent == nil or hum.Health <= 0 then
             destroyPlayerData(player)
         elseif label and hum.MaxHealth > 0 then
             local ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
@@ -204,10 +208,6 @@ local function updateAll(dt)
             local hp  = math.floor(hum.Health + 0.5)
             local max = math.floor(hum.MaxHealth + 0.5)
             label.Text = string.format("%s [%d/%d]", player.Name, hp, max)
-
-            if hum.Health <= 0 then
-                destroyPlayerData(player)
-            end
         end
     end
 end
