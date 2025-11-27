@@ -53,6 +53,22 @@ local function destroyPlayerData(player)
     module._data[player] = nil
 end
 
+-- ========= ЛОГИКА КОМАНД =========
+-- Подсвечиваем только врагов, себя НЕ трогаем
+
+local function isEnemy(player)
+    if player == LocalPlayer then
+        return false
+    end
+
+    -- если у игры нет команд, то все, кроме LocalPlayer, считаются врагами
+    if not LocalPlayer.Team or not player.Team then
+        return player ~= LocalPlayer
+    end
+
+    return player.Team ~= LocalPlayer.Team
+end
+
 -- Цвет по HP: 1 = зелёный, 0.5 = жёлтый, 0 = красный
 local function getHealthColor(ratio)
     ratio = math.clamp(ratio, 0, 1)
@@ -120,7 +136,38 @@ local function setupCharacter(player, character)
     }
 end
 
+-- слежение за сменой команды
+local function trackTeamChange(player)
+    local key = "TeamChanged_" .. player.UserId
+    addConnection(key, player:GetPropertyChangedSignal("Team"):Connect(function()
+        -- если стал тиммейтом – убираем ESP
+        if not isEnemy(player) then
+            destroyPlayerData(player)
+            return
+        end
+
+        -- если стал врагом – вешаем ESP, если есть персонаж
+        if player.Character then
+            destroyPlayerData(player)
+            setupCharacter(player, player.Character)
+        end
+    end))
+end
+
 local function onPlayerAdded(player)
+    -- не трогаем локального игрока вообще
+    if player == LocalPlayer then
+        return
+    end
+
+    -- слушаем смену команды
+    trackTeamChange(player)
+
+    -- если это не враг (тиммейт/мы сами) — не создаём ESP
+    if not isEnemy(player) then
+        return
+    end
+
     if player.Character then
         setupCharacter(player, player.Character)
     end
@@ -128,7 +175,9 @@ local function onPlayerAdded(player)
     local key = "Respawn_" .. player.UserId
     addConnection(key, player.CharacterAdded:Connect(function(newChar)
         destroyPlayerData(player)
-        setupCharacter(player, newChar)
+        if isEnemy(player) then
+            setupCharacter(player, newChar)
+        end
     end))
 end
 
@@ -173,8 +222,8 @@ function module:OnEnable()
         onPlayerAdded(plr)
     end
 
-    addConnection("PlayerAdded",   Players.PlayerAdded:Connect(onPlayerAdded))
-    addConnection("PlayerRemoving",Players.PlayerRemoving:Connect(onPlayerRemoving))
+    addConnection("PlayerAdded",    Players.PlayerAdded:Connect(onPlayerAdded))
+    addConnection("PlayerRemoving", Players.PlayerRemoving:Connect(onPlayerRemoving))
 
     addConnection("RenderUpdate", RunService.RenderStepped:Connect(function(dt)
         updateAll(dt)
