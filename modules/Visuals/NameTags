@@ -1,1 +1,217 @@
+local NameTags = {
+    Name     = "NameTags",
+    Category = "Visuals",
+    Enabled  = false,
 
+    _data        = {},   -- [player] = {billboard, textLabel}
+    _connections = {},
+}
+
+local Players     = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- ========= УТИЛИТЫ =========
+
+local function disconnect(conn)
+    if conn then
+        pcall(function() conn:Disconnect() end)
+    end
+end
+
+local function addConnection(self, key, conn)
+    if key then
+        if self._connections[key] then
+            disconnect(self._connections[key])
+        end
+        self._connections[key] = conn
+    else
+        table.insert(self._connections, conn)
+    end
+end
+
+local function destroyPlayerData(self, player)
+    local info = self._data[player]
+    if not info then return end
+
+    if info.billboard then
+        pcall(function() info.billboard:Destroy() end)
+    end
+
+    self._data[player] = nil
+end
+
+-- ========= ЛОГИКА КОМАНД (если нужно подсвечивать только врагов) =========
+-- Можешь убрать isEnemy, если хочешь показывать ники вообще у всех.
+
+local function isEnemy(player)
+    if player == LocalPlayer then
+        return false
+    end
+
+    if not LocalPlayer.Team or not player.Team then
+        return player ~= LocalPlayer
+    end
+
+    return player.Team ~= LocalPlayer.Team
+end
+
+-- ========= СОЗДАНИЕ NAME TAG =========
+
+local function createNameTag(self, player, character)
+    if not character then return end
+
+    -- стараемся найти голову
+    local head = character:FindFirstChild("Head") or character:FindFirstChildWhichIsA("BasePart")
+    if not head then
+        -- ждём появления головы
+        local key = "HeadWait_" .. player.UserId
+        addConnection(self, key, character.ChildAdded:Connect(function(child)
+            if child.Name == "Head" or child:IsA("BasePart") then
+                disconnect(self._connections[key])
+                self._connections[key] = nil
+                createNameTag(self, player, character)
+            end
+        end))
+        return
+    end
+
+    -- BillboardGui над головой
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "NameTag"
+    billboard.Adornee = head
+    billboard.Size = UDim2.new(0, 200, 0, 50)     -- ширина / высота
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0) -- куда поднимать над головой
+    billboard.AlwaysOnTop = true
+    billboard.MaxDistance = 200                   -- дистанция видимости
+    billboard.ResetOnSpawn = false
+
+    -- Фон (опционально)
+    local bg = Instance.new("Frame")
+    bg.Name = "Background"
+    bg.BackgroundTransparency = 0.2
+    bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BorderSizePixel = 0
+    bg.Parent = billboard
+
+    -- Красивый текст
+    local text = Instance.new("TextLabel")
+    text.Name = "NameText"
+    text.AnchorPoint = Vector2.new(0.5, 0.5)
+    text.Position = UDim2.new(0.5, 0, 0.5, 0)
+    text.Size = UDim2.new(1, -10, 1, -10) -- небольшой отступ
+    text.BackgroundTransparency = 1
+
+    text.Text = player.DisplayName ~= "" and player.DisplayName or player.Name
+
+    -- ШРИФТ: подбери под себя
+    -- Enum.Font.GothamBold, FredokaOne, SourceSansSemibold, Carton, Arcade, etc.
+    text.Font = Enum.Font.GothamBold
+    text.TextScaled = true
+    text.TextColor3 = Color3.fromRGB(255, 255, 255)
+    text.TextStrokeTransparency = 0.2
+    text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+
+    text.Parent = bg
+    billboard.Parent = character
+
+    self._data[player] = {
+        billboard = billboard,
+        textLabel = text,
+    }
+end
+
+-- ========= ОБРАБОТКА ИГРОКОВ =========
+
+local function setupCharacter(self, player, character)
+    -- если нужны только враги
+    if not isEnemy(player) then
+        destroyPlayerData(self, player)
+        return
+    end
+
+    destroyPlayerData(self, player) -- на всякий случай очищаем старое
+    createNameTag(self, player, character)
+end
+
+local function trackTeamChange(self, player)
+    local key = "TeamChanged_" .. player.UserId
+    addConnection(self, key, player:GetPropertyChangedSignal("Team"):Connect(function()
+        -- при смене команды пересоздаём / удаляем
+        if not isEnemy(player) then
+            destroyPlayerData(self, player)
+            return
+        end
+
+        if player.Character then
+            setupCharacter(self, player, player.Character)
+        end
+    end))
+end
+
+local function onPlayerAdded(self, player)
+    if player == LocalPlayer then
+        return
+    end
+
+    trackTeamChange(self, player)
+
+    if not isEnemy(player) then
+        return
+    end
+
+    if player.Character then
+        setupCharacter(self, player, player.Character)
+    end
+
+    local key = "Respawn_" .. player.UserId
+    addConnection(self, key, player.CharacterAdded:Connect(function(newChar)
+        setupCharacter(self, player, newChar)
+    end))
+end
+
+local function onPlayerRemoving(self, player)
+    destroyPlayerData(self, player)
+end
+
+-- ========= ПУБЛИЧНЫЕ МЕТОДЫ МОДУЛЯ =========
+
+function NameTags:Init()
+    if not self._data then self._data = {} end
+    if not self._connections then self._connections = {} end
+end
+
+function NameTags:OnEnable()
+    self.Enabled = true
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        onPlayerAdded(self, plr)
+    end
+
+    addConnection(self, "PlayerAdded",    Players.PlayerAdded:Connect(function(plr)
+        onPlayerAdded(NameTags, plr)
+    end))
+
+    addConnection(self, "PlayerRemoving", Players.PlayerRemoving:Connect(function(plr)
+        onPlayerRemoving(NameTags, plr)
+    end))
+end
+
+function NameTags:OnDisable()
+    self.Enabled = false
+
+    for plr, _ in pairs(self._data) do
+        destroyPlayerData(self, plr)
+    end
+    self._data = {}
+
+    for key, conn in pairs(self._connections) do
+        disconnect(conn)
+        self._connections[key] = nil
+    end
+end
+
+function NameTags:OnTick(dt)
+end
+
+return NameTags
