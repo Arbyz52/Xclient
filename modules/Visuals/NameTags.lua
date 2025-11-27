@@ -40,14 +40,13 @@ local function destroyPlayerData(player)
     module._data[player] = nil
 end
 
--- ========= ЛОГИКА КОМАНД (как в ESP, только враги; если нужно для всех — убери isEnemy) =========
+-- ========= ЛОГИКА КОМАНД =========
 
 local function isEnemy(player)
     if player == LocalPlayer then
         return false
     end
 
-    -- если у игры нет команд, то все, кроме LocalPlayer, считаются врагами
     if not LocalPlayer.Team or not player.Team then
         return player ~= LocalPlayer
     end
@@ -60,7 +59,6 @@ end
 local function createNameTag(player, character)
     if not character then return end
 
-    -- ищем голову
     local head = character:FindFirstChild("Head") or character:FindFirstChildWhichIsA("BasePart")
     if not head then
         local key = "HeadWait_" .. player.UserId
@@ -74,7 +72,6 @@ local function createNameTag(player, character)
         return
     end
 
-    -- удаляем старый тег, если есть
     local old = character:FindFirstChild("NameTag")
     if old then
         pcall(function() old:Destroy() end)
@@ -83,41 +80,61 @@ local function createNameTag(player, character)
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "NameTag"
     billboard.Adornee = head
-    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.Size = UDim2.new(0, 150, 0, 30)   -- меньше размер
     billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = true
-    billboard.MaxDistance = 200
+    billboard.MaxDistance = 150
     billboard.ResetOnSpawn = false
 
-    local bg = Instance.new("Frame")
-    bg.Name = "Background"
-    bg.BackgroundTransparency = 0.2
-    bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    bg.Size = UDim2.new(1, 0, 1, 0)
-    bg.BorderSizePixel = 0
-    bg.Parent = billboard
-
+    -- фон убран, сразу текст
     local text = Instance.new("TextLabel")
     text.Name = "NameText"
     text.AnchorPoint = Vector2.new(0.5, 0.5)
     text.Position = UDim2.new(0.5, 0, 0.5, 0)
-    text.Size = UDim2.new(1, -10, 1, -10)
+    text.Size = UDim2.new(1, -10, 1, -6)
     text.BackgroundTransparency = 1
 
     text.Text = player.DisplayName ~= "" and player.DisplayName or player.Name
-    text.Font = Enum.Font.GothamBold      -- можно сменить на любой
-    text.TextScaled = true
+    text.Font = Enum.Font.GothamBold
+    text.TextScaled = false              -- не скейлим, контролируем размер
+    text.TextSize = 12                   -- поменьше буквы
     text.TextColor3 = Color3.fromRGB(255, 255, 255)
     text.TextStrokeTransparency = 0.2
     text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 
-    text.Parent = bg
+    -- "анимация" появления: завязка на расстоянии (резко, без плавности)
+    local MAX_SHOW_DISTANCE = 120
+    local charRoot = character:FindFirstChild("HumanoidRootPart") or head
+
+    text.Visible = false
+
+    -- обновление видимости по расстоянию
+    local function updateVisibility()
+        if not charRoot or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            text.Visible = false
+            return
+        end
+
+        local lpRoot = LocalPlayer.Character.HumanoidRootPart
+        local dist = (lpRoot.Position - charRoot.Position).Magnitude
+
+        -- РЕЗКИЙ порог: дальше MAX_SHOW_DISTANCE -> скрыт, ближе -> отображается
+        text.Visible = dist <= MAX_SHOW_DISTANCE
+    end
+
+    -- храним, чтобы апдейтить в OnTick при желании или повеситься на Heartbeat
     billboard.Parent = character
 
     module._data[player] = {
-        billboard = billboard,
-        textLabel = text,
+        billboard      = billboard,
+        textLabel      = text,
+        character      = character,
+        rootPart       = charRoot,
+        updateFunction = updateVisibility,
     }
+
+    -- первое обновление
+    updateVisibility()
 end
 
 -- ========= НАСТРОЙКА ЧАРА / КОМАНД =========
@@ -147,7 +164,6 @@ local function trackTeamChange(player)
 end
 
 local function onPlayerAdded(player)
-    -- не трогаем локального игрока
     if player == LocalPlayer then
         return
     end
@@ -182,13 +198,22 @@ end
 function module:OnEnable()
     self.Enabled = true
 
-    -- уже находящиеся игроки
     for _, plr in ipairs(Players:GetPlayers()) do
         onPlayerAdded(plr)
     end
 
     addConnection("PlayerAdded",    Players.PlayerAdded:Connect(onPlayerAdded))
     addConnection("PlayerRemoving", Players.PlayerRemoving:Connect(onPlayerRemoving))
+
+    -- обновляем видимость по расстоянию каждый кадр (резкий порог, без плавности)
+    local RunService = game:GetService("RunService")
+    addConnection("NameTagUpdate", RunService.RenderStepped:Connect(function()
+        for _, info in pairs(module._data) do
+            if info.updateFunction then
+                info.updateFunction()
+            end
+        end
+    end))
 end
 
 function module:OnDisable()
