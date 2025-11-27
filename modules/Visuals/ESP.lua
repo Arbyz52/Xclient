@@ -10,7 +10,6 @@ local module = {
 local Players     = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService  = game:GetService("RunService")
-local CoreGui     = game:GetService("CoreGui")
 
 -- ========= УТИЛИТЫ =========
 
@@ -28,17 +27,15 @@ local function addConnection(key, conn)
 end
 
 local function disableDefaultHp(humanoid)
-    if not humanoid then return end
-    pcall(function()
-        humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
-    end)
+    if humanoid then
+        pcall(function() humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff end)
+    end
 end
 
 local function restoreDefaultHp(humanoid)
-    if not humanoid then return end
-    pcall(function()
-        humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.DisplayWhenDamaged
-    end)
+    if humanoid then
+        pcall(function() humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.DisplayWhenDamaged end)
+    end
 end
 
 local function destroyPlayerData(player)
@@ -52,10 +49,8 @@ end
 
 local function isEnemy(player)
     if player == LocalPlayer then return false end
-    if not LocalPlayer.Team or not player.Team then
-        return player ~= LocalPlayer
-    end
-    return player.Team ~= LocalPlayer.Team
+    if not LocalPlayer.Team or not player.Team then return true end
+    return LocalPlayer.Team ~= player.Team
 end
 
 local function getHealthColor(ratio)
@@ -95,28 +90,21 @@ local function setupCharacter(player, character)
 
     disableDefaultHp(hum)
 
+    -- удаляем старый ESP
+    destroyPlayerData(player)
+
+    -- создаём Highlight
     local hl = Instance.new("Highlight")
     hl.Name = "ESP_Highlight"
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     hl.FillTransparency = 1
     hl.OutlineTransparency = 0
-
-    -- выбираем корректный Adornee
-    local adornee = character.PrimaryPart
-        or character:FindFirstChild("HumanoidRootPart")
-        or character:FindFirstChild("Torso")
-        or character:FindFirstChild("UpperTorso")
-        or character:FindFirstChildWhichIsA("BasePart")
-
-    if adornee then
-        hl.Adornee = adornee
-    end
+    hl.Adornee = character -- ключевой фикс: адорним на модель целиком
+    hl.Parent = character  -- ключевой фикс: родим в модель (Workspace)
 
     local ratio = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
     local col = getHealthColor(ratio)
     hl.OutlineColor = col
-
-    hl.Parent = CoreGui -- фикс: не в character
 
     module._data[player] = {
         humanoid  = hum,
