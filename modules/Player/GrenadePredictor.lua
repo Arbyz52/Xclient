@@ -5,27 +5,26 @@ local module = {
     Enabled  = false,
 
     _connections = {},
-    _predictors  = {}, -- хранит созданные предикторы
+    _predictors  = {},
 }
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local workspace = game:GetService("Workspace")
+local Workspace = game:GetService("Workspace")
 
 -- ===== УТИЛИТЫ =====
 local function disconnect(conn)
-    if conn then pcall(function() conn:Disconnect() end) end
+    if conn then
+        pcall(function() conn:Disconnect() end)
+    end
 end
 
 local function addConnection(key, conn)
-    if key then
-        if module._connections[key] then disconnect(module._connections[key]) end
-        module._connections[key] = conn
-    else
-        table.insert(module._connections, conn)
-    end
+    if not key then return end
+    if module._connections[key] then disconnect(module._connections[key]) end
+    module._connections[key] = conn
 end
 
 local function clearConnections()
@@ -35,7 +34,6 @@ local function clearConnections()
     end
 end
 
--- ===== ПОЛЕЗНЫЕ ФУНКЦИИ ДЛЯ ТРАЕКТОРИИ =====
 local function clampVec3Magnitude(v, maxMag)
     local m = v.Magnitude
     if m > maxMag then return v.Unit * maxMag end
@@ -46,7 +44,7 @@ local function makeRayParams(extraIgnore)
     local rp = RaycastParams.new()
     rp.FilterType = Enum.RaycastFilterType.Exclude
     local ignore = {}
-    local char = LocalPlayer.Character
+    local char = LocalPlayer and LocalPlayer.Character
     if char then table.insert(ignore, char) end
     if extraIgnore then
         for _, inst in ipairs(extraIgnore) do table.insert(ignore, inst) end
@@ -57,13 +55,6 @@ local function makeRayParams(extraIgnore)
 end
 
 -- ===== ФАБРИКА ПРЕДИКТОРА =====
--- opts: table (необязательно)
---   .ThrowSpeed (number) - скорость броска
---   .ExplodeTime (number) - время до взрыва
---   .KeyOn (Enum.KeyCode) - клавиша включения (по умолчанию Four)
---   .KeyOff (table of Enum.KeyCode) - клавиши выключения (по умолчанию {One, Two, Three})
---   .MinStartDist, .StartOffsetForward - параметры смещения от камеры
--- Возвращает объект { Start = fn, Stop = fn, Destroy = fn }
 function module.CreatePredictor(opts)
     opts = opts or {}
     local THROW_SPEED = opts.ThrowSpeed or 78
@@ -73,7 +64,7 @@ function module.CreatePredictor(opts)
     local MIN_START_DIST = opts.MinStartDist or 1.2
     local START_OFFSET_FORWARD = opts.StartOffsetForward or 1.2
 
-    -- симуляция параметры (можно расширить через opts)
+    -- sim params
     local STEPS = 260
     local DT = 1/120
     local AIR_DRAG = 0.01
@@ -88,7 +79,7 @@ function module.CreatePredictor(opts)
     local SURFACE_OFFSET = RADIUS + 0.02
     local MAX_SPEED = 120
 
-    -- визуализация
+    -- visuals
     local SEG_RADIUS = opts.SegRadius or 0.06
     local SEG_COLOR = opts.SegColor or Color3.fromRGB(0, 255, 170)
     local SEG_MATERIAL = opts.SegMaterial or Enum.Material.Neon
@@ -97,18 +88,20 @@ function module.CreatePredictor(opts)
     local FADE_START = opts.FadeStart or 0.7
     local UPDATE_RATE = opts.UpdateRate or 1/30
 
-    -- внутренние переменные
+    -- internals
     local predictionFolder = nil
     local segPool = {}
     local explodePart = nil
     local predConn = nil
+    local keyConn = nil
     local predicting = false
     local lastUpdate = 0
 
-    -- очистка старых объектов
     local function clearOldPrediction()
-        local old = workspace:FindFirstChild("GrenadePrediction")
-        if old then old:Destroy() end
+        local old = Workspace:FindFirstChild("GrenadePrediction")
+        if old then
+            pcall(function() old:Destroy() end)
+        end
     end
 
     local function ensureFolder()
@@ -116,7 +109,7 @@ function module.CreatePredictor(opts)
         clearOldPrediction()
         predictionFolder = Instance.new("Folder")
         predictionFolder.Name = "GrenadePrediction"
-        predictionFolder.Parent = workspace
+        predictionFolder.Parent = Workspace
     end
 
     local function createSegment(i)
@@ -158,12 +151,18 @@ function module.CreatePredictor(opts)
 
     local function clearVisuals()
         for i, v in pairs(segPool) do
-            if v then v:Destroy() segPool[i] = nil end
+            if v then
+                pcall(function() v:Destroy() end)
+                segPool[i] = nil
+            end
         end
-        if explodePart then explodePart:Destroy() explodePart = nil end
+        if explodePart then
+            pcall(function() explodePart:Destroy() end)
+            explodePart = nil
+        end
     end
 
-    -- симуляция (взята упрощённо, но полная)
+    -- physics helpers
     local function reflectVelocity(vel, normal)
         local vN_mag = vel:Dot(normal)
         local vN = vN_mag * normal
@@ -177,7 +176,7 @@ function module.CreatePredictor(opts)
     local function computeTrajectory(origin, velocity, explodeTime)
         local points = {}
         local rp = makeRayParams({predictionFolder})
-        local g = Vector3.new(0, -workspace.Gravity, 0)
+        local g = Vector3.new(0, -Workspace.Gravity, 0)
 
         local pos = origin
         local vel = clampVec3Magnitude(velocity, MAX_SPEED)
@@ -204,13 +203,13 @@ function module.CreatePredictor(opts)
                     stepTime = DT * scale
                 end
 
-                local result = workspace:Raycast(pos, stepVel, rp)
+                local result = Workspace:Raycast(pos, stepVel, rp)
                 if result then
                     pos = result.Position
                     table.insert(points, pos)
-                    t += stepTime
+                    t = t + stepTime
 
-                    bounceCount += 1
+                    bounceCount = bounceCount + 1
                     if bounceCount > MAX_BOUNCES then break end
 
                     if vel.Magnitude < SLIDE_ENTER_SPEED then
@@ -226,7 +225,7 @@ function module.CreatePredictor(opts)
                 else
                     pos = pos + stepVel
                     table.insert(points, pos)
-                    t += stepTime
+                    t = t + stepTime
 
                     vel = vel + g * DT
                     vel = vel * (1 - AIR_DRAG * DT)
@@ -247,11 +246,11 @@ function module.CreatePredictor(opts)
                     stepTime = DT * scale
                 end
 
-                local result = workspace:Raycast(pos, stepVel, rp)
+                local result = Workspace:Raycast(pos, stepVel, rp)
                 if result then
                     pos = result.Position + result.Normal * SURFACE_OFFSET
                     table.insert(points, pos)
-                    t += stepTime
+                    t = t + stepTime
 
                     vel = vel - vel:Dot(result.Normal) * result.Normal
                     vel = vel * 0.85
@@ -261,7 +260,7 @@ function module.CreatePredictor(opts)
                 else
                     pos = pos + stepVel
                     table.insert(points, pos)
-                    t += stepTime
+                    t = t + stepTime
 
                     if groundNormal then pos = pos + groundNormal * 0.0005 end
                     if vel.Magnitude < STOP_THRESHOLD then break end
@@ -269,14 +268,10 @@ function module.CreatePredictor(opts)
             end
         end
 
-        if not explodePoint and #points > 0 then
-            explodePoint = points[#points]
-        end
-
+        if not explodePoint and #points > 0 then explodePoint = points[#points] end
         return points, explodePoint
     end
 
-    -- рендер: используем ПОЛНУЮ траекторию, но старт рендера смещаем
     local function renderCylindricalLine(fullPoints, explodePoint)
         if not fullPoints or #fullPoints < 2 then
             clearVisuals()
@@ -284,10 +279,9 @@ function module.CreatePredictor(opts)
         end
 
         ensureFolder()
-        local camPos = workspace.CurrentCamera.CFrame.Position
-        local camLook = workspace.CurrentCamera.CFrame.LookVector
+        local camPos = Workspace.CurrentCamera.CFrame.Position
+        local camLook = Workspace.CurrentCamera.CFrame.LookVector
 
-        -- найти первую точку дальше MIN_START_DIST
         local firstIndex = 1
         for i = 1, #fullPoints do
             if (fullPoints[i] - camPos).Magnitude >= MIN_START_DIST then
@@ -340,20 +334,18 @@ function module.CreatePredictor(opts)
         end
     end
 
-    -- получение стартовых параметров броска (HRP + камера)
     local function getThrowParams()
-        local char = LocalPlayer.Character
+        local char = LocalPlayer and LocalPlayer.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
         local startPos = hrp.Position + Vector3.new(0, 1.5, 0)
         local charVel = Vector3.zero
         local lv = hrp.AssemblyLinearVelocity
         if lv then charVel = Vector3.new(lv.X, 0, lv.Z) end
-        local velocity = workspace.CurrentCamera.CFrame.LookVector.Unit * THROW_SPEED + Vector3.new(0, 5, 0) + charVel * 0.35
+        local velocity = Workspace.CurrentCamera.CFrame.LookVector.Unit * THROW_SPEED + Vector3.new(0, 5, 0) + charVel * 0.35
         return startPos, velocity
     end
 
-    -- цикл обновления
     local function loopUpdate(dt)
         lastUpdate = lastUpdate + dt
         if lastUpdate < UPDATE_RATE then return end
@@ -374,14 +366,10 @@ function module.CreatePredictor(opts)
         renderCylindricalLine(points, explodePoint)
     end
 
-    -- управление клавишами
-    local keyConn = nil
     local function onInputBegan(input, gp)
         if gp then return end
         if input.KeyCode == KEY_ON then
-            if not predicting then
-                predicting = true
-            end
+            predicting = true
         else
             for _, k in ipairs(KEY_OFF) do
                 if input.KeyCode == k then
@@ -393,7 +381,6 @@ function module.CreatePredictor(opts)
         end
     end
 
-    -- публичные методы предиктора
     local predictor = {}
 
     function predictor:Start()
@@ -409,7 +396,7 @@ function module.CreatePredictor(opts)
         if keyConn then disconnect(keyConn) keyConn = nil end
         clearVisuals()
         if predictionFolder and predictionFolder.Parent then
-            predictionFolder:Destroy()
+            pcall(function() predictionFolder:Destroy() end)
             predictionFolder = nil
         end
     end
@@ -421,7 +408,7 @@ function module.CreatePredictor(opts)
     return predictor
 end
 
--- ===== МЕТОДЫ МОДУЛЯ =====
+-- ===== МОДУЛЬНЫЕ МЕТОДЫ =====
 function module:Init()
     self._connections = {}
     self._predictors = {}
@@ -429,7 +416,6 @@ end
 
 function module:OnEnable()
     self.Enabled = true
-    -- создаём один предиктор по умолчанию и запускаем его
     local pred = module.CreatePredictor()
     module._predictors["default"] = pred
     pred:Start()
