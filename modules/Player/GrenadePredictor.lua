@@ -1,7 +1,7 @@
 -- modules/Visuals/GrenadePredictor.lua
 local module = {
     Name     = "GrenadePredictor",
-    Category = "Visuals",
+    Category = "Player",
     Enabled  = false,
 
     _connections = {},
