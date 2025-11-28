@@ -6,6 +6,11 @@
       "name": "Example"
     },
     {
+      "path": "modules/Misc/SkinChanger.lua",
+      "category": "Misc",
+      "name": "SkinChanger"
+    },
+    {
       "path": "modules/Visuals/ESP.lua",
       "category": "Visuals",
       "name": "ESP"
