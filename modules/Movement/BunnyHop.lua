@@ -1,24 +1,27 @@
--- modules/Movement/BunnyHopLegit.lua
+-- modules/Movement/BunnyHop.lua
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 
+local VERSION = "BunnyHop v3.2 (No Friction - Fixed)"
+print("[Module] Loaded: " .. VERSION)
+
 local module = {
-    Name = "BunnyHop Legit",
+    Name     = "BunnyHop Legit",
     Category = "Movement",
-    Enabled = false,
+    Enabled  = false,
 }
 
 local CONFIG = {
     HoldKey    = Enum.KeyCode.Space,
-    SpeedMulti = 1.0, -- 1.0 = обычная скорость персонажа (WalkSpeed), 1.1 = чуть быстрее
+    SpeedMulti = 1.05, -- 1.0 = скорость бега, 1.05 = чуть быстрее для плавности
 }
 
 local steppedConn
 
--- Получение персонажа
+-- Аккуратный геттер персонажа
 local function getChar()
     local char = LocalPlayer.Character
     if not char then return nil, nil end
@@ -28,43 +31,46 @@ local function getChar()
     return hum, hrp
 end
 
--- Основная логика
+-- Основная логика, вызывается каждый кадр
 local function tickFrame(self)
-    -- Если модуль выключен — выход
-    if not self.Enabled then return end
-
-    -- ИСПОЛЬЗУЕМ IsKeyDown (как в рабочей версии), это намного надежнее
-    if not UserInputService:IsKeyDown(CONFIG.HoldKey) then return end
+    -- Если модуль выключен или кнопка не зажата, ничего не делаем
+    if not self.Enabled or not UserInputService:IsKeyDown(CONFIG.HoldKey) then
+        return
+    end
 
     local hum, hrp = getChar()
     if not hum or not hrp then return end
 
-    -- Если мы не пытаемся идти (WASD не нажаты) — не трогаем физику
-    if hum.MoveDirection.Magnitude <= 0 then return end
+    -- Работаем только если игрок пытается двигаться
+    local dir = hum.MoveDirection
+    if dir.Magnitude <= 0 then return end
 
-    -- 1. АВТОПРЫЖОК
+    -- 1. АВТОПРЫЖОК: Если на земле - прыгаем
     if hum.FloorMaterial ~= Enum.Material.Air then
         hum.Jump = true
     end
 
-    -- 2. УБИРАЕМ ТРЕНИЕ (Legit Logic)
-    -- Вместо силы 24, берем твою WalkSpeed
+    -- 2. УБИРАЕМ ТРЕНИЕ (Сохранение скорости)
+    -- Эта часть теперь выполняется КАЖДЫЙ КАДР, пока зажат пробел,
+    -- как на земле, так и в воздухе, что и создает эффект "отсутствия трения".
     local targetSpeed = hum.WalkSpeed * CONFIG.SpeedMulti
-    local dir = hum.MoveDirection
-    local currentY = hrp.AssemblyLinearVelocity.Y
+    local currentVelocity = hrp.AssemblyLinearVelocity
 
-    -- Обновляем скорость X и Z каждый кадр, чтобы не было торможения при приземлении
-    hrp.AssemblyLinearVelocity = Vector3.new(dir.X * targetSpeed, currentY, dir.Z * targetSpeed)
+    -- Принудительно устанавливаем горизонтальную скорость, но СОХРАНЯЕМ текущую вертикальную.
+    -- Это и есть ключ к исправлению: мы не мешаем прыжку и гравитации.
+    hrp.AssemblyLinearVelocity = Vector3.new(
+        dir.X * targetSpeed,
+        currentVelocity.Y, -- <-- Сохраняем Y!
+        dir.Z * targetSpeed
+    )
 end
 
 function module:OnEnable()
     self.Enabled = true
-    print("[Module] BHop Legit Enabled")
-    
-    -- Очистка старых коннектов на всякий случай
+    print("[Module] Legit BHop Enabled")
+
+    -- Просто подключаем основной цикл к RenderStepped
     if steppedConn then steppedConn:Disconnect() end
-    
-    -- Запускаем цикл
     steppedConn = RunService.RenderStepped:Connect(function()
         tickFrame(self)
     end)
@@ -72,14 +78,15 @@ end
 
 function module:OnDisable()
     self.Enabled = false
-    print("[Module] BHop Legit Disabled")
-    
+    print("[Module] Legit BHop Disabled")
+
     if steppedConn then
         steppedConn:Disconnect()
         steppedConn = nil
     end
 end
 
+-- Пустые функции для совместимости с лоадером
 function module:Init() end
 function module:OnTick(dt) end
 
