@@ -1,88 +1,138 @@
--- modules/Visuals/UIRemover.lua
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
 
 local module = {
-    Name = "UI Remover (Click)",
+    Name = "UI Remover",
     Category = "Visuals",
-    Enabled = false,
+    Enabled = false, 
 }
 
-local clickConnection
+local steppedConn
+local inputConn
 
--- Функция для "удаления" (скрытия) элемента
-local function hideElement(guiObject)
-    if not guiObject then return end
+-- Переменные для подсветки
+local highlightGui
+local highlightBox
+local currentTarget = nil -- То, на что мы сейчас смотрим
+
+-- Создаем рамку выделения (чтобы ты видел, что удаляешь)
+local function createHighlight()
+    if highlightGui then highlightGui:Destroy() end
     
-    -- Мы используем Visible = false, это безопаснее, чем Destroy()
-    -- Если использовать Destroy(), игровой скрипт может выдать ошибку, если попытается обновить патроны/хп
-    pcall(function()
-        guiObject.Visible = false
-    end)
-    print("[UI Remover] Hidden: " .. guiObject.Name)
+    highlightGui = Instance.new("ScreenGui")
+    highlightGui.Name = "RemoverHighlight"
+    highlightGui.DisplayOrder = 10000 -- Поверх всего
+    highlightGui.IgnoreGuiInset = true
+    -- Пытаемся засунуть в CoreGui (чтобы не удалялось вместе с UI), если не выйдет - в PlayerGui
+    pcall(function() highlightGui.Parent = CoreGui end)
+    if not highlightGui.Parent then highlightGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+    highlightBox = Instance.new("Frame")
+    highlightBox.Parent = highlightGui
+    highlightBox.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    highlightBox.BackgroundTransparency = 0.6
+    highlightBox.BorderSizePixel = 2
+    highlightBox.BorderColor3 = Color3.fromRGB(255, 255, 255)
+    highlightBox.Visible = false
+end
+
+local function destroyHighlight()
+    if highlightGui then 
+        highlightGui:Destroy() 
+        highlightGui = nil
+        highlightBox = nil
+    end
+end
+
+-- Главная логика (каждый кадр)
+local function tickFrame()
+    -- 1. АГРЕССИВНО РАЗБЛОКИРУЕМ КУРСОР
+    -- Делаем это каждый кадр, иначе игра заберет мышку обратно
+    UserInputService.MouseIconEnabled = true
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+
+    -- 2. ИЩЕМ ЭЛЕМЕНТ ПОД МЫШКОЙ
+    local mousePos = UserInputService:GetMouseLocation()
+    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+    
+    currentTarget = nil
+    
+    if playerGui then
+        -- Получаем список всех GUI под курсором
+        local objects = playerGui:GetGuiObjectsAtPosition(mousePos.X, mousePos.Y)
+        
+        for _, obj in ipairs(objects) do
+            -- Фильтруем: нам нужны только видимые элементы, и это не должна быть наша подсветка
+            if obj.Visible and obj.Transparency < 1 and obj.Parent ~= highlightGui then
+                -- Не удаляем корневые ScreenGui, ищем кнопки, картинки, рамки
+                if obj:IsA("GuiObject") then
+                    currentTarget = obj
+                    break -- Берем самый верхний
+                end
+            end
+        end
+    end
+
+    -- 3. ОБНОВЛЯЕМ ПОДСВЕТКУ
+    if currentTarget and highlightBox then
+        highlightBox.Visible = true
+        highlightBox.Size = UDim2.fromOffset(currentTarget.AbsoluteSize.X, currentTarget.AbsoluteSize.Y)
+        highlightBox.Position = UDim2.fromOffset(currentTarget.AbsolutePosition.X, currentTarget.AbsolutePosition.Y)
+    elseif highlightBox then
+        highlightBox.Visible = false
+    end
+end
+
+-- Обработка клика
+local function onInput(input, gp)
+    -- Если нажали ЛКМ и у нас есть цель
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if currentTarget then
+            pcall(function()
+                currentTarget.Visible = false
+            end)
+            print("[UI Remover] Deleted: " .. currentTarget.Name)
+            
+            -- Сразу выключаем модуль после удаления
+            module:OnDisable()
+        else
+            -- Если кликнули в пустоту - тоже выключаем
+            module:OnDisable()
+        end
+    end
 end
 
 function module:OnEnable()
     self.Enabled = true
+    print("[UI Remover] Enabled - Click UI to delete")
     
-    -- 1. ПОКАЗЫВАЕМ КУРСОР
-    -- Чтобы ты мог выбрать элемент, нужно разблокировать мышку
-    UserInputService.MouseIconEnabled = true
-    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-    
-    print("[UI Remover] Select a UI element to remove...")
+    createHighlight()
 
-    -- 2. СЛУШАЕМ ОДИН КЛИК
-    -- Если уже было подключение - убираем (на всякий случай)
-    if clickConnection then clickConnection:Disconnect() end
-    
-    clickConnection = UserInputService.InputBegan:Connect(function(input)
-        -- Нам нужен только левый клик мыши
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            
-            -- Получаем позицию мышки
-            local mousePos = UserInputService:GetMouseLocation()
-            
-            -- Ищем все GUI элементы под мышкой (в PlayerGui)
-            local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-            if playerGui then
-                -- GetGuiObjectsAtPosition возвращает список. Первый элемент [1] - это самый верхний (тот, что ты видишь)
-                local objects = playerGui:GetGuiObjectsAtPosition(mousePos.X, mousePos.Y)
-                
-                if objects and #objects > 0 then
-                    local target = objects[1]
-                    
-                    -- Небольшая защита, чтобы случайно не удалить весь экран (ScreenGui), удаляем только рамки/текст/картинки
-                    if target:IsA("Frame") or target:IsA("ImageLabel") or target:IsA("TextLabel") or target:IsA("ImageButton") or target:IsA("TextButton") then
-                        hideElement(target)
-                    else
-                        -- Если кликнули по чему-то странному, пробуем скрыть всё равно
-                        hideElement(target)
-                    end
-                end
-            end
+    -- Подключаем цикл (RenderStepped)
+    if steppedConn then steppedConn:Disconnect() end
+    steppedConn = RunService.RenderStepped:Connect(tickFrame)
 
-            -- 3. ВЫКЛЮЧАЕМ ФУНКЦИЮ ПОСЛЕ КЛИКА
-            -- Вызываем OnDisable вручную, чтобы вернуть игру в норму
-            module:OnDisable()
-        end
-    end)
+    -- Подключаем клик
+    if inputConn then inputConn:Disconnect() end
+    inputConn = UserInputService.InputBegan:Connect(onInput)
 end
 
 function module:OnDisable()
     self.Enabled = false
     
-    -- Отключаем прослушивание кликов
-    if clickConnection then
-        clickConnection:Disconnect()
-        clickConnection = nil
-    end
+    -- Отключаем все
+    if steppedConn then steppedConn:Disconnect() steppedConn = nil end
+    if inputConn then inputConn:Disconnect() inputConn = nil end
+    
+    destroyHighlight()
 
-    -- 4. ВОЗВРАЩАЕМ УПРАВЛЕНИЕ
-    -- Скрываем курсор и блокируем его обратно в центр экрана (для шутеров)
+    -- ВОЗВРАЩАЕМ КУРСОР В ИГРУ
+    -- Блокируем его обратно в центр, чтобы ты мог стрелять
     UserInputService.MouseIconEnabled = false
     UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
     
