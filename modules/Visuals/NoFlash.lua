@@ -5,82 +5,75 @@ local Lighting = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 
 local module = {
-    Name = "No Flash (Brute Force)",
+    Name = "No Flash (Destroyer)",
     Category = "Visuals",
     Enabled = false,
 }
 
--- Имена, по которым ищем гадость
-local BAD_NAMES = {
+local steppedConn
+
+-- Список имен, которые мы БУДЕМ УДАЛЯТЬ
+local BAD_GUI_NAMES = {
     ["Flashbang"] = true,
     ["Blind"] = true,
     ["Flash"] = true,
     ["WhiteScreen"] = true,
-    ["StunEffect"] = true,
-    ["Blur"] = true,        -- Размытие
-    ["ColorCorrection"] = true -- Цветокоррекция (иногда делает экран белым)
+    ["Stun"] = true,
 }
 
-local steppedConn
-
--- Функция, которая УНИЧТОЖАЕТ видимость объекта, не удаляя его (чтобы игра не крашнулась)
-local function nukeObject(obj)
-    -- 1. GUI Элементы (Квадраты, Картинки)
-    if obj:IsA("GuiObject") or obj:IsA("ScreenGui") then
-        obj.Visible = false
-        
-        -- Если игра принудительно ставит Visible = true, эти параметры спасут:
-        if obj:IsA("GuiObject") then
-            obj.BackgroundTransparency = 1
-            if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then
-                obj.ImageTransparency = 1
+local function cleanLighting()
+    -- Проходимся по эффектам освещения
+    for _, effect in ipairs(Lighting:GetChildren()) do
+        -- Если это Цветокоррекция и она делает экран белым (Яркость или Контраст выкручены)
+        if effect:IsA("ColorCorrectionEffect") then
+            if effect.Brightness > 0.2 or effect.Contrast > 0.5 then
+                effect:Destroy() -- Удаляем эффект
             end
-            -- Убираем за пределы экрана и сжимаем
-            obj.Position = UDim2.new(10, 0, 10, 0)
-            obj.Size = UDim2.new(0, 0, 0, 0)
         end
-
-    -- 2. Эффекты освещения (Lighting)
-    elseif obj:IsA("PostEffect") then
-        obj.Enabled = false
+        
+        -- Если это Размытие (Blur)
+        if effect:IsA("BlurEffect") then
+            effect:Destroy()
+        end
     end
 end
 
-local function loop()
-    -- 1. Ищем в Lighting (Освещение)
-    -- Некоторые игры делают экран белым через ColorCorrection
-    for _, v in ipairs(Lighting:GetChildren()) do
-        if BAD_NAMES[v.Name] or (v:IsA("ColorCorrectionEffect") and v.Brightness > 0.5) then
-            nukeObject(v)
-        end
-    end
-
-    -- 2. Ищем в PlayerGui (Интерфейс)
+local function cleanGui()
     local gui = LocalPlayer:FindFirstChild("PlayerGui")
     if not gui then return end
-
-    -- Пытаемся найти объект "Flashbang" рекурсивно.
-    -- FindFirstChild(name, true) ищет во всех вложенных папках.
-    local flash = gui:FindFirstChild("Flashbang", true)
-    if flash then
-        nukeObject(flash)
-    end
-
-    -- Проверяем другие имена, если Flashbang не найден
-    local blind = gui:FindFirstChild("Blind", true)
-    if blind then nukeObject(blind) end
     
-    local white = gui:FindFirstChild("WhiteScreen", true)
-    if white then nukeObject(white) end
+    -- Мы ищем ВООБЩЕ ВЕЗДЕ (рекурсивно)
+    for _, v in ipairs(gui:GetDescendants()) do
+        if BAD_GUI_NAMES[v.Name] then
+            v:Destroy() -- УДАЛЯЕМ БЕЗ ЖАЛОСТИ
+        end
+        
+        -- Дополнительная проверка: Если это БЕЛЫЙ КВАДРАТ на весь экран
+        if v:IsA("Frame") and v.Visible == true then
+            -- Проверяем, белый ли он
+            if v.BackgroundColor3.R > 0.9 and v.BackgroundColor3.G > 0.9 and v.BackgroundColor3.B > 0.9 then
+                -- Проверяем, непрозрачный ли он
+                if v.BackgroundTransparency < 0.5 then
+                    -- Проверяем, большой ли он (больше 500 пикселей)
+                    if v.AbsoluteSize.X > 800 and v.AbsoluteSize.Y > 600 then
+                         -- Это точно флешка (белая стена), удаляем
+                         v:Destroy()
+                    end
+                end
+            end
+        end
+    end
 end
 
 function module:OnEnable()
     self.Enabled = true
-    print("[NoFlash] Enabled (Loop Mode)")
+    print("[NoFlash] Enabled - DESTROY MODE")
     
-    -- Запускаем проверку КАЖДЫЙ КАДР.
-    -- Это перебивает скрипты игры. Даже если игра включит флешку, мы в том же кадре её выключим.
-    steppedConn = RunService.RenderStepped:Connect(loop)
+    -- Запускаем очистку КАЖДЫЙ КАДР
+    steppedConn = RunService.RenderStepped:Connect(function()
+        cleanLighting() -- Чистим свет (если белый экран от яркости)
+        cleanGui()      -- Чистим интерфейс (если белый экран от картинки)
+    end)
 end
 
 function module:OnDisable()
