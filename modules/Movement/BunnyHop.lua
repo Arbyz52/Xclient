@@ -1,28 +1,24 @@
--- modules/Movement/BunnyHop.lua
-
+-- modules/Movement/BunnyHopLegit.lua
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 
-local VERSION = "BunnyHop v3.2 (Legit Fixed)"
-print("[Module] Loaded: " .. VERSION)
-
 local module = {
-    Name     = "BunnyHop Legit",
+    Name = "BunnyHop Legit",
     Category = "Movement",
-    Enabled  = false,
+    Enabled = false,
 }
 
 local CONFIG = {
     HoldKey    = Enum.KeyCode.Space,
-    SpeedMulti = 1.1, -- 1.0 = обычная скорость, 1.1 = немного быстрее
+    SpeedMulti = 1.0, -- 1.0 = обычная скорость персонажа (WalkSpeed), 1.1 = чуть быстрее
 }
 
--- Коннекты
-local steppedConn, charAddedConn
+local steppedConn
 
+-- Получение персонажа
 local function getChar()
     local char = LocalPlayer.Character
     if not char then return nil, nil end
@@ -32,57 +28,56 @@ local function getChar()
     return hum, hrp
 end
 
--- Основная функция движения
-local function processBhop(hum, hrp)
+-- Основная логика
+local function tickFrame(self)
+    -- Если модуль выключен — выход
+    if not self.Enabled then return end
+
+    -- ИСПОЛЬЗУЕМ IsKeyDown (как в рабочей версии), это намного надежнее
+    if not UserInputService:IsKeyDown(CONFIG.HoldKey) then return end
+
+    local hum, hrp = getChar()
+    if not hum or not hrp then return end
+
+    -- Если мы не пытаемся идти (WASD не нажаты) — не трогаем физику
     if hum.MoveDirection.Magnitude <= 0 then return end
 
-    -- Автопрыжок
+    -- 1. АВТОПРЫЖОК
     if hum.FloorMaterial ~= Enum.Material.Air then
         hum.Jump = true
     end
 
-    -- Убираем трение
+    -- 2. УБИРАЕМ ТРЕНИЕ (Legit Logic)
+    -- Вместо силы 24, берем твою WalkSpeed
     local targetSpeed = hum.WalkSpeed * CONFIG.SpeedMulti
     local dir = hum.MoveDirection
     local currentY = hrp.AssemblyLinearVelocity.Y
 
+    -- Обновляем скорость X и Z каждый кадр, чтобы не было торможения при приземлении
     hrp.AssemblyLinearVelocity = Vector3.new(dir.X * targetSpeed, currentY, dir.Z * targetSpeed)
-end
-
-local function attach(self)
-    -- Анти-дупликат
-    if steppedConn then steppedConn:Disconnect() steppedConn = nil end
-    if charAddedConn then charAddedConn:Disconnect() charAddedConn = nil end
-
-    steppedConn = RunService.RenderStepped:Connect(function()
-        if not self.Enabled then return end
-        if not UserInputService:IsKeyDown(CONFIG.HoldKey) then return end
-
-        local hum, hrp = getChar()
-        if hum and hrp then
-            processBhop(hum, hrp)
-        end
-    end)
-
-    charAddedConn = LocalPlayer.CharacterAdded:Connect(function()
-        -- tickFrame всегда проверяет актуальный char, поэтому тут ничего не нужно
-        -- но оставляем хук для совместимости
-        -- print("[BunnyHop Legit] Character respawned")
-    end)
 end
 
 function module:OnEnable()
     self.Enabled = true
     print("[Module] BHop Legit Enabled")
-    attach(self)
+    
+    -- Очистка старых коннектов на всякий случай
+    if steppedConn then steppedConn:Disconnect() end
+    
+    -- Запускаем цикл
+    steppedConn = RunService.RenderStepped:Connect(function()
+        tickFrame(self)
+    end)
 end
 
 function module:OnDisable()
     self.Enabled = false
     print("[Module] BHop Legit Disabled")
-
-    if steppedConn then steppedConn:Disconnect() steppedConn = nil end
-    if charAddedConn then charAddedConn:Disconnect() charAddedConn = nil end
+    
+    if steppedConn then
+        steppedConn:Disconnect()
+        steppedConn = nil
+    end
 end
 
 function module:Init() end
