@@ -1,4 +1,4 @@
--- modules/Visuals/GrenadePredictor.lua
+
 local module = {
     Name     = "GrenadePredictor",
     Category = "Player",
@@ -14,7 +14,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
--- ===== УТИЛИТЫ =====
+
 local function disconnect(conn)
     if conn then
         pcall(function() conn:Disconnect() end)
@@ -54,7 +54,7 @@ local function makeRayParams(extraIgnore)
     return rp
 end
 
--- ===== ФАБРИКА ПРЕДИКТОРА =====
+
 function module.CreatePredictor(opts)
     opts = opts or {}
     local THROW_SPEED = opts.ThrowSpeed or 78
@@ -64,7 +64,7 @@ function module.CreatePredictor(opts)
     local MIN_START_DIST = opts.MinStartDist or 1.2
     local START_OFFSET_FORWARD = opts.StartOffsetForward or 1.2
 
-    -- sim params
+
     local STEPS = 260
     local DT = 1/120
     local AIR_DRAG = 0.01
@@ -79,7 +79,7 @@ function module.CreatePredictor(opts)
     local SURFACE_OFFSET = RADIUS + 0.02
     local MAX_SPEED = 120
 
-    -- visuals
+
     local SEG_RADIUS = opts.SegRadius or 0.06
     local SEG_COLOR = opts.SegColor or Color3.fromRGB(0, 255, 170)
     local SEG_MATERIAL = opts.SegMaterial or Enum.Material.Neon
@@ -88,7 +88,6 @@ function module.CreatePredictor(opts)
     local FADE_START = opts.FadeStart or 0.7
     local UPDATE_RATE = opts.UpdateRate or 1/30
 
-    -- internals
     local predictionFolder = nil
     local segPool = {}
     local explodePart = nil
@@ -162,7 +161,7 @@ function module.CreatePredictor(opts)
         end
     end
 
-    -- physics helpers
+
     local function reflectVelocity(vel, normal)
         local vN_mag = vel:Dot(normal)
         local vN = vN_mag * normal
@@ -408,7 +407,7 @@ function module.CreatePredictor(opts)
     return predictor
 end
 
--- ===== МОДУЛЬНЫЕ МЕТОДЫ =====
+
 function module:Init()
     self._connections = {}
     self._predictors = {}
