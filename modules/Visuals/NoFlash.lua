@@ -10,117 +10,87 @@ local module = {
     Enabled = false,
 }
 
--- Список названий, которые используются для эффекта слепоты
-local FLASH_NAMES = {
-    ["Flashbang"] = true,  -- То, что было у тебя в логах
+-- Имена, по которым ищем гадость
+local BAD_NAMES = {
+    ["Flashbang"] = true,
     ["Blind"] = true,
     ["Flash"] = true,
     ["WhiteScreen"] = true,
     ["StunEffect"] = true,
+    ["Blur"] = true,        -- Размытие
+    ["ColorCorrection"] = true -- Цветокоррекция (иногда делает экран белым)
 }
 
-local connections = {}
-local monitoredObjects = {} -- Объекты, за которыми мы следим
+local steppedConn
 
--- Функция отключения конкретного объекта
-local function disableObject(obj)
-    if not obj then return end
-    
-    -- Если это GUI (картинка/рамка)
+-- Функция, которая УНИЧТОЖАЕТ видимость объекта, не удаляя его (чтобы игра не крашнулась)
+local function nukeObject(obj)
+    -- 1. GUI Элементы (Квадраты, Картинки)
     if obj:IsA("GuiObject") or obj:IsA("ScreenGui") then
         obj.Visible = false
-        obj.Transparency = 1 -- На случай, если игра принудительно включает Visible
         
-    -- Если это эффект в Lighting (ColorCorrection, Blur)
+        -- Если игра принудительно ставит Visible = true, эти параметры спасут:
+        if obj:IsA("GuiObject") then
+            obj.BackgroundTransparency = 1
+            if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then
+                obj.ImageTransparency = 1
+            end
+            -- Убираем за пределы экрана и сжимаем
+            obj.Position = UDim2.new(10, 0, 10, 0)
+            obj.Size = UDim2.new(0, 0, 0, 0)
+        end
+
+    -- 2. Эффекты освещения (Lighting)
     elseif obj:IsA("PostEffect") then
         obj.Enabled = false
     end
 end
 
--- Проверка объекта: является ли он флешкой?
-local function checkObject(obj)
-    if FLASH_NAMES[obj.Name] then
-        -- Отключаем сейчас
-        disableObject(obj)
-        
-        -- И подписываемся на изменения, чтобы игра не включила его обратно
-        if not monitoredObjects[obj] then
-            monitoredObjects[obj] = obj:GetPropertyChangedSignal("Visible"):Connect(function()
-                if module.Enabled then 
-                    obj.Visible = false 
-                end
-            end)
-            
-            -- Дополнительная страховка для Lighting
-            if obj:IsA("PostEffect") then
-                monitoredObjects[obj] = obj:GetPropertyChangedSignal("Enabled"):Connect(function()
-                    if module.Enabled then obj.Enabled = false end
-                end)
-            end
-            
-            print("[NoFlash] Disabled effect: " .. obj.Name)
-        end
-    end
-end
-
--- Сканирование всего интерфейса (запускается один раз при включении)
-local function scanAll()
-    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if playerGui then
-        -- Используем GetDescendants, чтобы найти флешку, даже если она глубоко в папках
-        for _, v in ipairs(playerGui:GetDescendants()) do
-            checkObject(v)
-        end
-    end
-    
-    -- Сканируем Lighting
+local function loop()
+    -- 1. Ищем в Lighting (Освещение)
+    -- Некоторые игры делают экран белым через ColorCorrection
     for _, v in ipairs(Lighting:GetChildren()) do
-        checkObject(v)
+        if BAD_NAMES[v.Name] or (v:IsA("ColorCorrectionEffect") and v.Brightness > 0.5) then
+            nukeObject(v)
+        end
     end
+
+    -- 2. Ищем в PlayerGui (Интерфейс)
+    local gui = LocalPlayer:FindFirstChild("PlayerGui")
+    if not gui then return end
+
+    -- Пытаемся найти объект "Flashbang" рекурсивно.
+    -- FindFirstChild(name, true) ищет во всех вложенных папках.
+    local flash = gui:FindFirstChild("Flashbang", true)
+    if flash then
+        nukeObject(flash)
+    end
+
+    -- Проверяем другие имена, если Flashbang не найден
+    local blind = gui:FindFirstChild("Blind", true)
+    if blind then nukeObject(blind) end
+    
+    local white = gui:FindFirstChild("WhiteScreen", true)
+    if white then nukeObject(white) end
 end
 
 function module:OnEnable()
     self.Enabled = true
-    print("[NoFlash] Enabled")
+    print("[NoFlash] Enabled (Loop Mode)")
     
-    -- 1. Сканируем то, что уже есть
-    scanAll()
-    
-    -- 2. Слушаем новые объекты в PlayerGui (на случай, если флешка создается при взрыве)
-    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
-    table.insert(connections, playerGui.DescendantAdded:Connect(checkObject))
-    
-    -- 3. Слушаем новые эффекты в Lighting
-    table.insert(connections, Lighting.ChildAdded:Connect(checkObject))
-    
-    -- 4. ЖЕСТКИЙ ЦИКЛ (Страховка)
-    -- Каждую секунду проверяем, не появилось ли чего, если ивенты не сработали
-    table.insert(connections, RunService.RenderStepped:Connect(function()
-        if math.random() > 0.95 then -- Не каждый кадр, чтобы не лагало, но часто
-            local gui = LocalPlayer:FindFirstChild("PlayerGui")
-            if gui then
-                -- Проверяем самые частые места
-                local flash = gui:FindFirstChild("Flashbang", true) -- Рекурсивный поиск
-                if flash then disableObject(flash) end
-            end
-        end
-    end))
+    -- Запускаем проверку КАЖДЫЙ КАДР.
+    -- Это перебивает скрипты игры. Даже если игра включит флешку, мы в том же кадре её выключим.
+    steppedConn = RunService.RenderStepped:Connect(loop)
 end
 
 function module:OnDisable()
     self.Enabled = false
     print("[NoFlash] Disabled")
     
-    -- Отключаем все следилки
-    for _, conn in ipairs(connections) do
-        conn:Disconnect()
+    if steppedConn then
+        steppedConn:Disconnect()
+        steppedConn = nil
     end
-    connections = {}
-    
-    for _, conn in pairs(monitoredObjects) do
-        conn:Disconnect()
-    end
-    monitoredObjects = {}
 end
 
 function module:Init() end
