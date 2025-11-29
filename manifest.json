@@ -46,9 +46,9 @@
       "name": "BunnyHop Legit"
     },
     {
-      "path": "modules/Visuals/UIRemover.lua",
+      "path": "modules/Visuals/NoFlash.lua",
       "category": "Visuals",
-      "name": "UI Remover"
+      "name": "No Flash"
     }
   ]
 }
