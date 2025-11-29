@@ -1,4 +1,3 @@
--- ===================== gui.lua (Xclient, с кнопкой Обновить) ======================
 
 local Gui = {}
 
@@ -7,9 +6,6 @@ function Gui.Init(ModuleManager)
     local CoreGui          = game:GetService("CoreGui")
     local TweenService     = game:GetService("TweenService")
 
-    ---------------------------------------------------
-    -- ScreenGui
-    ---------------------------------------------------
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "XclientMenu"
     screenGui.ResetOnSpawn = false
@@ -21,9 +17,7 @@ function Gui.Init(ModuleManager)
     end)
     screenGui.Parent = parent
 
-    ---------------------------------------------------
-    -- Контейнер для колонок
-    ---------------------------------------------------
+
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "ColumnsHolder"
     mainFrame.Size = UDim2.new(0, 1100, 0, 420)
@@ -36,12 +30,10 @@ function Gui.Init(ModuleManager)
     layout.FillDirection = Enum.FillDirection.Horizontal
     layout.Padding = UDim.new(0, 26)
 
-    local allButtons = {} -- для поиска
+    local allButtons = {}
     local preferredOrder = {"Combat", "Movement", "Visuals", "Player", "Misc"}
 
-    ---------------------------------------------------
-    -- Твин цвета
-    ---------------------------------------------------
+
     local function tweenColor(inst, targetColor)
         TweenService:Create(
             inst,
@@ -50,9 +42,7 @@ function Gui.Init(ModuleManager)
         ):Play()
     end
 
-    ---------------------------------------------------
-    -- Колонка категории
-    ---------------------------------------------------
+
     local function createCategoryColumn(categoryName, modules)
         table.sort(modules, function(a, b)
             return (a.Name or "") < (b.Name or "")
@@ -167,9 +157,7 @@ function Gui.Init(ModuleManager)
         end
     end
 
-    ---------------------------------------------------
-    -- Пересборка колонок (для «Обновить»)
-    ---------------------------------------------------
+
     local function rebuildColumns()
         allButtons = {}
 
@@ -210,11 +198,9 @@ function Gui.Init(ModuleManager)
         end
     end
 
-    rebuildColumns() -- первая отрисовка
+    rebuildColumns() 
 
-    ---------------------------------------------------
-    -- Поиск снизу
-    ---------------------------------------------------
+
     local searchFrame = Instance.new("Frame")
     searchFrame.Size = UDim2.new(0, 320, 0, 32)
     searchFrame.Position = UDim2.new(0.5, -160, 0.5, 240)
@@ -254,13 +240,11 @@ function Gui.Init(ModuleManager)
 
     searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
 
-    ---------------------------------------------------
-    -- Кнопка «Обновить» (левый верх угла экрана)
-    ---------------------------------------------------
+
     local refreshButton = Instance.new("TextButton")
     refreshButton.Name = "RefreshButton"
     refreshButton.Size = UDim2.new(0, 110, 0, 30)
-    refreshButton.Position = UDim2.new(0, 20, 0, 20)  -- ЛЕВО ВВЕРХУ
+    refreshButton.Position = UDim2.new(0, 20, 0, 20) 
     refreshButton.BackgroundColor3 = Color3.fromRGB(20, 20, 32)
     refreshButton.BackgroundTransparency = 0.12
     refreshButton.BorderSizePixel = 0
@@ -301,9 +285,7 @@ function Gui.Init(ModuleManager)
         end
     end)
 
-    ---------------------------------------------------
-    -- Анимация открытия/закрытия
-    ---------------------------------------------------
+
     local menuOpen = false
 
     local function playOpenAnim()
@@ -345,9 +327,7 @@ function Gui.Init(ModuleManager)
         end
     end
 
-    ---------------------------------------------------
-    -- Управление (RightShift + поиск)
-    ---------------------------------------------------
+
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
 
@@ -363,7 +343,6 @@ function Gui.Init(ModuleManager)
         end
     end)
 
-    print("[Xclient] GUI инициализирован, RightShift - открыть/закрыть")
 end
 
 return Gui
