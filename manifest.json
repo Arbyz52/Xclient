@@ -31,9 +31,9 @@
       "name": "Fly"
     },
     {
-      "path": "modules/Combat/AimBot (Alt).lua",
+      "path": "modules/Combat/AimBot.lua",
       "category": "Combat",
-      "name": "AimBot (Alt)"
+      "name": "AimBot"
     }
   ]
 }
