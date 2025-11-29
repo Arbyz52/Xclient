@@ -13,94 +13,133 @@ local module = {
     Enabled = false, 
 }
 
-local steppedConn
-local inputConn
-
--- Подсветка
-local highlightGui
+-- ===== ВИЗУАЛЫ =====
+local guiLayer
 local highlightBox
+local fakeCursor -- Наш собственный курсор
 local currentTarget = nil 
 
--- Создание красной рамки
-local function createHighlight()
-    if highlightGui then highlightGui:Destroy() end
-    
-    highlightGui = Instance.new("ScreenGui")
-    highlightGui.Name = "RemoverHighlight"
-    highlightGui.DisplayOrder = 10000 
-    highlightGui.IgnoreGuiInset = true
-    highlightGui.ResetOnSpawn = false
-    
-    -- Пытаемся засунуть в CoreGui (чтобы рамка была поверх всего), если нет прав - в PlayerGui
-    pcall(function() highlightGui.Parent = CoreGui end)
-    if not highlightGui.Parent then highlightGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+-- Черный список имен, которые мы игнорируем (оверлеи)
+local IGNORE_NAMES = {
+    ["Flashbang"] = true,
+    ["Blind"] = true,
+    ["Vignette"] = true,
+    ["Crosshairs"] = true, -- Если не хочешь удалять прицел случайно
+    ["Container"] = true,
+    ["Blood"] = true,
+}
 
+local function createVisuals()
+    if guiLayer then guiLayer:Destroy() end
+    
+    guiLayer = Instance.new("ScreenGui")
+    guiLayer.Name = "RemoverVisuals"
+    guiLayer.DisplayOrder = 10000 
+    guiLayer.IgnoreGuiInset = true
+    guiLayer.ResetOnSpawn = false
+    
+    pcall(function() guiLayer.Parent = CoreGui end)
+    if not guiLayer.Parent then guiLayer.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+    -- 1. КРАСНАЯ РАМКА (Выделение)
     highlightBox = Instance.new("Frame")
-    highlightBox.Parent = highlightGui
-    highlightBox.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    highlightBox.BackgroundTransparency = 0.7
+    highlightBox.Parent = guiLayer
+    highlightBox.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    highlightBox.BackgroundTransparency = 0.6
     highlightBox.BorderSizePixel = 2
     highlightBox.BorderColor3 = Color3.fromRGB(255, 255, 255)
     highlightBox.Visible = false
+    highlightBox.ZIndex = 1
+
+    -- 2. ФЕЙКОВЫЙ КУРСОР (Красная точка)
+    fakeCursor = Instance.new("Frame")
+    fakeCursor.Name = "FakeCursor"
+    fakeCursor.Parent = guiLayer
+    fakeCursor.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Зеленый, чтобы было видно
+    fakeCursor.Size = UDim2.fromOffset(8, 8)
+    fakeCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+    fakeCursor.Visible = true
+    fakeCursor.ZIndex = 2
+    
+    -- Делаем его круглым
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = fakeCursor
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 0, 0)
+    stroke.Thickness = 1
+    stroke.Parent = fakeCursor
 end
 
-local function destroyHighlight()
-    if highlightGui then 
-        highlightGui:Destroy() 
-        highlightGui = nil
+local function destroyVisuals()
+    if guiLayer then 
+        guiLayer:Destroy() 
+        guiLayer = nil
         highlightBox = nil
+        fakeCursor = nil
     end
 end
 
--- ФИЛЬТР: Проверяем, стоит ли удалять этот объект
+-- ПРОВЕРКА: Важный ли это элемент или мусор (оверлей)
 local function isValidTarget(obj)
     if not obj.Visible then return false end
-    if obj.Parent == highlightGui then return false end -- Не удалять саму подсветку
+    if obj:IsDescendantOf(guiLayer) then return false end -- Не выделять наш курсор
     
-    -- Получаем размеры экрана
+    -- Игнорируем по имени (Флешки, Кровь и т.д.)
+    if IGNORE_NAMES[obj.Name] then return false end
+
     local viewport = Camera.ViewportSize
     local objSize = obj.AbsoluteSize
     
-    -- 1. Если объект прозрачный И занимает почти весь экран -> это мусорный контейнер, пропускаем
-    if obj.BackgroundTransparency >= 0.95 then
-        -- Если это Текст или Картинка - берем (даже если фон прозрачный)
-        if obj:IsA("TextLabel") or obj:IsA("ImageLabel") or obj:IsA("ImageButton") or obj:IsA("TextButton") then
+    -- Если объект полностью прозрачный
+    if obj.BackgroundTransparency >= 0.98 then
+        -- Но это картинка или текст -> БЕРЕМ (это иконка оружия)
+        if obj:IsA("ImageLabel") or obj:IsA("ImageButton") or obj:IsA("TextLabel") or obj:IsA("TextButton") then
             return true
         end
         
-        -- Если это просто Frame размером с экран - игнорируем
-        if objSize.X >= viewport.X - 50 and objSize.Y >= viewport.Y - 50 then
-            return false
-        end
+        -- Если это просто пустой Frame -> ИГНОРИРУЕМ (скорее всего контейнер)
+        return false
+    end
+    
+    -- Если объект огромный (на весь экран) и прозрачный -> ИГНОРИРУЕМ
+    if objSize.X >= viewport.X - 20 and objSize.Y >= viewport.Y - 20 then
+        return false
     end
     
     return true
 end
 
--- Главный цикл
-local function tickFrame()
-    -- 1. СПАМ КУРСОРОМ (Чтобы игра не скрывала его)
-    UserInputService.MouseIconEnabled = true
-    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+-- ===== ЛОГИКА =====
+local steppedConn
+local inputConn
 
-    -- 2. ПОИСК ЭЛЕМЕНТА
+local function tickFrame()
+    -- Двигаем наш фейковый курсор за реальной мышкой
     local mousePos = UserInputService:GetMouseLocation()
-    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
     
+    if fakeCursor then
+        fakeCursor.Position = UDim2.fromOffset(mousePos.X, mousePos.Y)
+    end
+
+    -- Ищем элемент под курсором
+    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
     currentTarget = nil
     
     if playerGui then
+        -- Получаем ВСЕ объекты под точкой
         local objects = playerGui:GetGuiObjectsAtPosition(mousePos.X, mousePos.Y)
         
         for _, obj in ipairs(objects) do
             if isValidTarget(obj) then
                 currentTarget = obj
-                break -- Нашли верхний подходящий объект
+                break -- Нашли первый нормальный объект (не флешку)
             end
         end
     end
 
-    -- 3. ОТРИСОВКА РАМКИ
+    -- Обновляем красную рамку
     if currentTarget and highlightBox then
         highlightBox.Visible = true
         highlightBox.Size = UDim2.fromOffset(currentTarget.AbsoluteSize.X, currentTarget.AbsoluteSize.Y)
@@ -111,30 +150,35 @@ local function tickFrame()
 end
 
 local function onInput(input, gp)
+    -- Клик ЛКМ
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         if currentTarget then
-            -- Скрываем объект
+            -- Скрываем
             pcall(function() currentTarget.Visible = false end)
-            print("[UI Remover] Hidden: " .. currentTarget.Name)
+            print("[UI Remover] HIDDEN: " .. currentTarget.Name)
             
-            -- Выключаем модуль
+            -- Выключаем скрипт
             module:OnDisable()
         else
-            -- Если кликнули в пустоту, тоже выключаем, чтобы не застрять
-            -- (Закомментируй строчку ниже, если хочешь кликать пока не попадешь)
-            -- module:OnDisable() 
+            -- Если кликнули в пустоту
+            print("[UI Remover] Clicked nothing valid")
+            -- Можно раскомментировать, если хочешь выключать при промахе:
+            -- module:OnDisable()
         end
     end
 end
 
 function module:OnEnable()
     self.Enabled = true
-    print("[UI Remover] ON. Click RED highlighted UI to remove.")
-    createHighlight()
+    print("[UI Remover] ON. Look for the GREEN DOT.")
+    
+    createVisuals()
 
+    -- Запускаем цикл
     if steppedConn then steppedConn:Disconnect() end
     steppedConn = RunService.RenderStepped:Connect(tickFrame)
 
+    -- Слушаем клик
     if inputConn then inputConn:Disconnect() end
     inputConn = UserInputService.InputBegan:Connect(onInput)
 end
@@ -145,12 +189,7 @@ function module:OnDisable()
     if steppedConn then steppedConn:Disconnect() steppedConn = nil end
     if inputConn then inputConn:Disconnect() inputConn = nil end
     
-    destroyHighlight()
-
-    -- Возвращаем управление игрой
-    UserInputService.MouseIconEnabled = false
-    UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
-    
+    destroyVisuals()
     print("[UI Remover] OFF")
 end
 
