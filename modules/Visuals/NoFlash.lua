@@ -5,7 +5,7 @@ local Lighting = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 
 local module = {
-    Name = "No Flash",
+    Name = "No Flash (Brute Force)",
     Category = "Visuals",
     Enabled = false,
 }
