@@ -16,7 +16,7 @@ local module = {
 
 local CONFIG = {
     HoldKey    = Enum.KeyCode.Space,
-    SpeedMulti = 1.0, -- 1.0 = обычная скорость, 1.1 = немного быстрее
+    SpeedMulti = 1.1, -- 1.0 = обычная скорость, 1.1 = немного быстрее
 }
 
 local holding = false
