@@ -1,4 +1,4 @@
--- ===================== main.lua (GitHub + manifest + raw scripts) ======================
+-- ===================== main.lua (GitHub + manifest + raw scripts + AutoConfig) ======================
 -- Запуск:
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/Arbyz52/Xclient/main/main.lua"))()
 
@@ -11,11 +11,13 @@ local RAW_BASE = string.format(
     GITHUB_USER, GITHUB_REPO, GITHUB_BRANCH
 )
 
-local MANIFEST_URL = RAW_BASE .. "manifest.json"
-local GUI_URL      = RAW_BASE .. "gui.lua"
+local MANIFEST_URL   = RAW_BASE .. "manifest.json"
+local GUI_URL        = RAW_BASE .. "gui.lua"
+local AUTOCONFIG_URL = RAW_BASE .. "autoconfig.lua" -- Ссылка на автоконфиг
 
 local HttpService = game:GetService("HttpService")
 local RunService  = game:GetService("RunService")
+local Players     = game:GetService("Players")
 
 ----------------------------------------------------------------
 -- HTTP GET
@@ -234,6 +236,58 @@ end
 -- ПЕРВАЯ ЗАГРУЗКА МОДУЛЕЙ
 ----------------------------------------------------------------
 ModuleManager:ReloadFromManifest()
+
+----------------------------------------------------------------
+-- АВТОКОНФИГ (AUTOCONFIG) - ИНТЕГРАЦИЯ
+----------------------------------------------------------------
+local function initAutoConfig()
+    -- 1. Собираем модули в удобную таблицу (Dictionary) для конфига
+    local ModulesMap = {}
+    for _, mod in ipairs(ModuleManager.Modules) do
+        if mod.Name then
+            ModulesMap[mod.Name] = mod
+        end
+    end
+
+    -- 2. Скачиваем и запускаем autoconfig.lua
+    local codeOK, code = pcall(httpGet, AUTOCONFIG_URL)
+    if not codeOK then
+        warn("[Xclient] Не удалось скачать autoconfig.lua")
+        return
+    end
+
+    local chunk, err = loadstring(code, "@autoconfig.lua")
+    if not chunk then
+        warn("[Xclient] Ошибка loadstring autoconfig.lua:", err)
+        return
+    end
+
+    local ok, AutoConfigLib = pcall(chunk)
+    if not ok or type(AutoConfigLib) ~= "table" then
+        warn("[Xclient] Ошибка выполнения autoconfig.lua или неверный return")
+        return
+    end
+
+    print("[Xclient] AutoConfig загружен. Применяем настройки...")
+
+    -- 3. Загружаем конфиг (Включаем то, что было включено)
+    AutoConfigLib.Load(ModulesMap)
+
+    -- 4. Запускаем цикл сохранения (каждые 5 секунд)
+    task.spawn(function()
+        while true do
+            task.wait(5)
+            AutoConfigLib.Save(ModulesMap)
+        end
+    end)
+
+    -- 5. Сохраняем при выходе
+    Players.PlayerRemoving:Connect(function()
+        AutoConfigLib.Save(ModulesMap)
+    end)
+end
+
+initAutoConfig()
 
 ----------------------------------------------------------------
 -- ЗАГРУЗКА GUI
