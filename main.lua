@@ -1,6 +1,3 @@
--- ===================== main.lua (GitHub + manifest + raw scripts + AutoConfig) ======================
--- Запуск:
--- loadstring(game:HttpGet("https://raw.githubusercontent.com/Arbyz52/Xclient/main/main.lua"))()
 
 local GITHUB_USER   = "Arbyz52"
 local GITHUB_REPO   = "Xclient"
@@ -13,17 +10,15 @@ local RAW_BASE = string.format(
 
 local MANIFEST_URL   = RAW_BASE .. "manifest.json"
 local GUI_URL        = RAW_BASE .. "gui.lua"
-local AUTOCONFIG_URL = RAW_BASE .. "autoconfig.lua" -- Ссылка на автоконфиг
+local AUTOCONFIG_URL = RAW_BASE .. "autoconfig.lua"
 
 local HttpService = game:GetService("HttpService")
 local RunService  = game:GetService("RunService")
 local Players     = game:GetService("Players")
 
-----------------------------------------------------------------
--- HTTP GET
-----------------------------------------------------------------
+
 local function httpGet(url)
-    -- 1) Roblox HttpGet
+
     if game and game.HttpGet then
         local ok, res = pcall(function()
             return game:HttpGet(url)
@@ -33,7 +28,7 @@ local function httpGet(url)
         end
     end
 
-    -- 2) syn.request
+
     if syn and syn.request then
         local ok, res = pcall(syn.request, {
             Url = url,
@@ -44,7 +39,7 @@ local function httpGet(url)
         end
     end
 
-    -- 3) http_request
+
     if http_request then
         local ok, res = pcall(http_request, {
             Url = url,
@@ -55,7 +50,6 @@ local function httpGet(url)
         end
     end
 
-    -- 4) request
     if request then
         local ok, res = pcall(request, {
             Url = url,
@@ -66,7 +60,7 @@ local function httpGet(url)
         end
     end
 
-    -- 5) HttpService:GetAsync
+
     local ok, res = pcall(function()
         return HttpService:GetAsync(url)
     end)
@@ -82,9 +76,7 @@ local function getJSON(url)
     return HttpService:JSONDecode(body)
 end
 
-----------------------------------------------------------------
--- ModuleManager
-----------------------------------------------------------------
+
 local ModuleManager = {
     Modules    = {},
     Categories = {},
@@ -129,13 +121,10 @@ function ModuleManager:Tick(dt)
     end
 end
 
-----------------------------------------------------------------
--- ReloadFromManifest: поддержка обычных модулей и raw-скриптов
-----------------------------------------------------------------
+
 function ModuleManager:ReloadFromManifest()
     print("[Xclient] Загружаю manifest.json...")
 
-    -- выключаем старые
     for _, mod in ipairs(self.Modules) do
         if mod.Enabled and type(mod.OnDisable) == "function" then
             pcall(function() mod:OnDisable() end)
@@ -167,7 +156,7 @@ function ModuleManager:ReloadFromManifest()
             local path     = entry.path
             local category = entry.category or "Misc"
             local name     = entry.name     or path
-            local mtype    = (entry.type or entry.kind or "module"):lower() -- "module" или "raw"
+            local mtype    = (entry.type or entry.kind or "module"):lower()
 
             local url = RAW_BASE .. path
 
@@ -176,7 +165,7 @@ function ModuleManager:ReloadFromManifest()
                 warn("[Xclient] Не удалось скачать", path, ":", code)
             else
                 if mtype == "raw" then
-                    -- RAW-СКРИПТ: просто выполнить при включении
+
                     local chunk, lerr = loadstring(code, "@" .. path)
                     if not chunk then
                         warn("[Xclient] loadstring error (raw)", path, ":", lerr)
@@ -205,7 +194,7 @@ function ModuleManager:ReloadFromManifest()
                         print("[Xclient] RAW-скрипт загружен:", category .. "/" .. name)
                     end
                 else
-                    -- Обычный модуль: ждём таблицу
+
                     local chunk, lerr = loadstring(code, "@" .. path)
                     if not chunk then
                         warn("[Xclient] loadstring error (module)", path, ":", lerr)
@@ -232,16 +221,12 @@ function ModuleManager:ReloadFromManifest()
     return true
 end
 
-----------------------------------------------------------------
--- ПЕРВАЯ ЗАГРУЗКА МОДУЛЕЙ
-----------------------------------------------------------------
+
 ModuleManager:ReloadFromManifest()
 
-----------------------------------------------------------------
--- АВТОКОНФИГ (AUTOCONFIG) - ИНТЕГРАЦИЯ
-----------------------------------------------------------------
+
 local function initAutoConfig()
-    -- 1. Собираем модули в удобную таблицу (Dictionary) для конфига
+
     local ModulesMap = {}
     for _, mod in ipairs(ModuleManager.Modules) do
         if mod.Name then
@@ -249,7 +234,7 @@ local function initAutoConfig()
         end
     end
 
-    -- 2. Скачиваем и запускаем autoconfig.lua
+
     local codeOK, code = pcall(httpGet, AUTOCONFIG_URL)
     if not codeOK then
         warn("[Xclient] Не удалось скачать autoconfig.lua")
@@ -268,12 +253,8 @@ local function initAutoConfig()
         return
     end
 
-    print("[Xclient] AutoConfig загружен. Применяем настройки...")
-
-    -- 3. Загружаем конфиг (Включаем то, что было включено)
     AutoConfigLib.Load(ModulesMap)
 
-    -- 4. Запускаем цикл сохранения (каждые 5 секунд)
     task.spawn(function()
         while true do
             task.wait(5)
@@ -281,7 +262,7 @@ local function initAutoConfig()
         end
     end)
 
-    -- 5. Сохраняем при выходе
+
     Players.PlayerRemoving:Connect(function()
         AutoConfigLib.Save(ModulesMap)
     end)
@@ -289,9 +270,7 @@ end
 
 initAutoConfig()
 
-----------------------------------------------------------------
--- ЗАГРУЗКА GUI
-----------------------------------------------------------------
+
 local function initGUI()
     local code = httpGet(GUI_URL)
     local chunk, err = loadstring(code, "@gui.lua")
@@ -315,9 +294,7 @@ end
 
 initGUI()
 
-----------------------------------------------------------------
--- ТИК
-----------------------------------------------------------------
+
 RunService.RenderStepped:Connect(function(dt)
     ModuleManager:Tick(dt)
 end)
