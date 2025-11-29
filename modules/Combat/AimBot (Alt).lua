@@ -7,7 +7,7 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local module = {
-    Name     = "AimBot (ALT)",
+    Name     = "AimBot (Alt)",
     Category = "Combat",
     Enabled  = false,
 }
