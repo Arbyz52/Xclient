@@ -6,7 +6,6 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 local VERSION = "BunnyHop v3.2 (No Friction - Fixed)"
-print("[Module] Loaded: " .. VERSION)
 
 local module = {
     Name     = "BunnyHop Legit",
@@ -67,7 +66,6 @@ end
 
 function module:OnEnable()
     self.Enabled = true
-    print("[Module] Legit BHop Enabled")
 
     -- Просто подключаем основной цикл к RenderStepped
     if steppedConn then steppedConn:Disconnect() end
@@ -78,7 +76,6 @@ end
 
 function module:OnDisable()
     self.Enabled = false
-    print("[Module] Legit BHop Disabled")
 
     if steppedConn then
         steppedConn:Disconnect()
