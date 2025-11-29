@@ -1,11 +1,12 @@
 -- modules/Movement/BunnyHop.lua
+
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 
-local VERSION = "BunnyHop v3.1 (No Friction)"
+local VERSION = "BunnyHop v3.2 (Legit Fixed)"
 print("[Module] Loaded: " .. VERSION)
 
 local module = {
@@ -19,8 +20,8 @@ local CONFIG = {
     SpeedMulti = 1.1, -- 1.0 = обычная скорость, 1.1 = немного быстрее
 }
 
-local holding = false
-local inputBeganConn, inputEndedConn, steppedConn
+-- Коннекты
+local steppedConn, charAddedConn
 
 local function getChar()
     local char = LocalPlayer.Character
@@ -33,58 +34,55 @@ end
 
 -- Основная функция движения
 local function processBhop(hum, hrp)
-    -- Если мы не пытаемся двигаться (WASD), ничего не делаем
     if hum.MoveDirection.Magnitude <= 0 then return end
 
-    -- 1. АВТОПРЫЖОК: Если касаемся земли - прыгаем
+    -- Автопрыжок
     if hum.FloorMaterial ~= Enum.Material.Air then
         hum.Jump = true
     end
 
-    -- 2. УБИРАЕМ ТОРМОЖЕНИЕ:
-    -- Берем текущую скорость ходьбы (WalkSpeed)
+    -- Убираем трение
     local targetSpeed = hum.WalkSpeed * CONFIG.SpeedMulti
     local dir = hum.MoveDirection
-    
-    -- Сохраняем текущую вертикальную скорость (Y), чтобы гравитация работала нормально
     local currentY = hrp.AssemblyLinearVelocity.Y
-    
-    -- Принудительно устанавливаем скорость по горизонтали.
-    -- Это выполняется каждый кадр, поэтому трение земли не успевает остановить персонажа.
+
     hrp.AssemblyLinearVelocity = Vector3.new(dir.X * targetSpeed, currentY, dir.Z * targetSpeed)
 end
 
-function module:OnEnable()
-    self.Enabled = true
-    
-    -- Отслеживаем нажатие клавиши (через ивенты, как в твоем примере)
-    inputBeganConn = UserInputService.InputBegan:Connect(function(input, gp)
-        if gp then return end
-        if input.KeyCode == CONFIG.HoldKey then holding = true end
-    end)
-    
-    inputEndedConn = UserInputService.InputEnded:Connect(function(input)
-        if input.KeyCode == CONFIG.HoldKey then holding = false end
-    end)
+local function attach(self)
+    -- Анти-дупликат
+    if steppedConn then steppedConn:Disconnect() steppedConn = nil end
+    if charAddedConn then charAddedConn:Disconnect() charAddedConn = nil end
 
-    -- Главный цикл
     steppedConn = RunService.RenderStepped:Connect(function()
-        -- Работаем только если модуль включен и кнопка зажата
-        if not self.Enabled or not holding then return end
-        
+        if not self.Enabled then return end
+        if not UserInputService:IsKeyDown(CONFIG.HoldKey) then return end
+
         local hum, hrp = getChar()
         if hum and hrp then
             processBhop(hum, hrp)
         end
     end)
+
+    charAddedConn = LocalPlayer.CharacterAdded:Connect(function()
+        -- tickFrame всегда проверяет актуальный char, поэтому тут ничего не нужно
+        -- но оставляем хук для совместимости
+        -- print("[BunnyHop Legit] Character respawned")
+    end)
+end
+
+function module:OnEnable()
+    self.Enabled = true
+    print("[Module] BHop Legit Enabled")
+    attach(self)
 end
 
 function module:OnDisable()
     self.Enabled = false
-    holding = false
-    if inputBeganConn then inputBeganConn:Disconnect() inputBeganConn = nil end
-    if inputEndedConn then inputEndedConn:Disconnect() inputEndedConn = nil end
+    print("[Module] BHop Legit Disabled")
+
     if steppedConn then steppedConn:Disconnect() steppedConn = nil end
+    if charAddedConn then charAddedConn:Disconnect() charAddedConn = nil end
 end
 
 function module:Init() end
