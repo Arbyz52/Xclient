@@ -16,7 +16,7 @@ local module = {
 local CONFIG = {
     FOV            = 180,
     AimSmoothSpeed = 12,
-    HoldBind       = Enum.UserInputType.MouseButton2, -- ПКМ
+    HoldKey        = Enum.KeyCode.LeftAlt, -- теперь Alt
     IgnoreTeammates = true,
 }
 
@@ -71,10 +71,10 @@ function module:OnEnable()
     -- бинды
     UserInputService.InputBegan:Connect(function(input,gp)
         if gp then return end
-        if input.UserInputType == CONFIG.HoldBind then aimHolding = true end
+        if input.KeyCode == CONFIG.HoldKey then aimHolding = true end
     end)
     UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == CONFIG.HoldBind then aimHolding = false end
+        if input.KeyCode == CONFIG.HoldKey then aimHolding = false end
     end)
 end
 
