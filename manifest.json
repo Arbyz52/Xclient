@@ -21,6 +21,11 @@
       "name": "NameTags"
     },
     {
+      "path": "modules/Player/GunSound.lua",
+      "category": "Player",
+      "name": "GunSound"
+    },
+    {
       "path": "modules/Player/GrenadePredictor.lua",
       "category": "Player",
       "name": "GrenadePredictor"
