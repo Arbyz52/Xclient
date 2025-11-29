@@ -146,9 +146,9 @@ local function MonitorPlayer(plr)
             if newHp < oldHp then
                 local dmg = oldHp - newHp
                 
-                -- Тайминг 0.5 сек
+
                 if (tick() - lastShootTime) < 0.5 then
-                    -- Проверка на врага
+
                     if LocalPlayer.Team == nil or plr.Team ~= LocalPlayer.Team then
                          PlayCustomSound(dmg)
                     end
@@ -201,7 +201,7 @@ function module:OnEnable()
         MonitorPlayer(p)
     end
     
-    print("[HitSound] Module Enabled")
+
 end
 
 function module:OnDisable()
@@ -215,8 +215,7 @@ function module:OnDisable()
     
 
     clearConnections()
-    
-    print("[HitSound] Module Disabled")
+
 end
 
 function module:OnTick(dt) end
