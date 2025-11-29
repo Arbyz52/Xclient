@@ -93,7 +93,7 @@ end
 
 function module:OnEnable()
     self.Enabled = true
-    print("[GunSound] Enabled")
+
 
     for _, v in ipairs(Workspace:GetDescendants()) do
         Check(v)
@@ -110,7 +110,7 @@ end
 
 function module:OnDisable()
     self.Enabled = false
-    print("[GunSound] Disabled")
+
     
 
     for _, conn in pairs(module._connections) do
