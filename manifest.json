@@ -46,9 +46,9 @@
       "name": "BunnyHop Legit"
     },
     {
-      "path": "modules/Visuals/NoFlash.lua",
+      "path": "modules/Visuals/AntiFlash.lua",
       "category": "Visuals",
-      "name": "No Flash"
+      "name": "AntiFlash"
     }
   ]
 }
