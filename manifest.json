@@ -44,6 +44,11 @@
       "path": "modules/Movement/BunnyHop.lua",
       "category": "Movement",
       "name": "BunnyHop Legit"
+    },
+    {
+      "path": "modules/Visuals/UIRemover.lua",
+      "category": "Visuals",
+      "name": "UI Remover"
     }
   ]
 }
