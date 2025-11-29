@@ -1,7 +1,6 @@
 -- modules/Movement/BunnyHop.lua
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -11,18 +10,14 @@ local module = {
     Enabled  = false,
 }
 
--- ==================== КОНФИГ ====================
 local CONFIG = {
-    HoldKey    = Enum.KeyCode.Space, -- удерживай пробел
-    Cooldown   = 0.08,               -- минимальный интервал между прыжками
-    PushForce  = 28,                 -- сила толчка по MoveDirection
+    HoldKey   = Enum.KeyCode.Space,
+    PushForce = 28,
 }
 
 local holding = false
-local lastHop = 0
-local inputBeganConn, inputEndedConn
+local stateConn, inputBeganConn, inputEndedConn
 
--- ==================== Вспомогательные ====================
 local function getChar()
     local char = LocalPlayer.Character
     if not char then return nil,nil end
@@ -32,26 +27,15 @@ local function getChar()
     return hum, hrp
 end
 
-local function doBhop(hum, hrp)
-    if hum.FloorMaterial == Enum.Material.Air then return end
-    local now = tick()
-    if (now - lastHop) < CONFIG.Cooldown then return end
-    lastHop = now
-
+local function hop(hum, hrp)
     hum:ChangeState(Enum.HumanoidStateType.Jumping)
-
-    task.spawn(function()
-        RunService.RenderStepped:Wait()
-        if not hrp.Parent then return end
-        local moveDir = hum.MoveDirection
-        if moveDir.Magnitude > 0 then
-            local push = moveDir.Unit * CONFIG.PushForce
-            hrp.Velocity = Vector3.new(push.X, hrp.Velocity.Y, push.Z)
-        end
-    end)
+    local moveDir = hum.MoveDirection
+    if moveDir.Magnitude > 0 then
+        local push = moveDir.Unit * CONFIG.PushForce
+        hrp.Velocity = Vector3.new(push.X, hrp.Velocity.Y, push.Z)
+    end
 end
 
--- ==================== Методы модуля ====================
 function module:OnEnable()
     self.Enabled = true
     inputBeganConn = UserInputService.InputBegan:Connect(function(input,gp)
@@ -61,6 +45,15 @@ function module:OnEnable()
     inputEndedConn = UserInputService.InputEnded:Connect(function(input)
         if input.KeyCode == CONFIG.HoldKey then holding = false end
     end)
+
+    local hum, hrp = getChar()
+    if hum then
+        stateConn = hum.StateChanged:Connect(function(_, new)
+            if self.Enabled and holding and new == Enum.HumanoidStateType.Landed then
+                hop(hum, hrp)
+            end
+        end)
+    end
 end
 
 function module:OnDisable()
@@ -68,18 +61,10 @@ function module:OnDisable()
     holding = false
     if inputBeganConn then inputBeganConn:Disconnect() inputBeganConn = nil end
     if inputEndedConn then inputEndedConn:Disconnect() inputEndedConn = nil end
+    if stateConn then stateConn:Disconnect() stateConn = nil end
 end
 
-function module:Init()
-    -- можно добавить логи или авто‑подсказку
-end
-
-function module:OnTick(dt)
-    if not self.Enabled or not holding then return end
-    local hum, hrp = getChar()
-    if hum and hrp then
-        doBhop(hum, hrp)
-    end
-end
+function module:Init() end
+function module:OnTick(dt) end
 
 return module
