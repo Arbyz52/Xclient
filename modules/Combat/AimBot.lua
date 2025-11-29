@@ -1,4 +1,4 @@
--- modules/Misc/AimAssist.lua
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -12,17 +12,16 @@ local module = {
     Enabled  = false,
 }
 
--- ==================== КОНФИГ ====================
 local CONFIG = {
     FOV            = 180,
     AimSmoothSpeed = 12,
-    HoldKey        = Enum.KeyCode.LeftAlt, -- теперь Alt
+    HoldKey        = Enum.KeyCode.LeftAlt,
     IgnoreTeammates = true,
 }
 
 local aimHolding = false
 
--- ==================== Вспомогательные функции ====================
+
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
     if not CONFIG.IgnoreTeammates then return true end
@@ -65,10 +64,10 @@ local function aimAt(head, dt)
     Camera.CFrame = Camera.CFrame:Lerp(desired, math.clamp(t,0,1))
 end
 
--- ==================== Методы модуля ====================
+
 function module:OnEnable()
     self.Enabled = true
-    -- бинды
+
     UserInputService.InputBegan:Connect(function(input,gp)
         if gp then return end
         if input.KeyCode == CONFIG.HoldKey then aimHolding = true end
@@ -84,7 +83,7 @@ function module:OnDisable()
 end
 
 function module:Init()
-    -- если нужно что-то подготовить
+
 end
 
 function module:OnTick(dt)
