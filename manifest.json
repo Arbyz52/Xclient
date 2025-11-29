@@ -1,11 +1,6 @@
 {
   "modules": [
     {
-      "path": "modules/Misc/Example.lua",
-      "category": "Misc",
-      "name": "Example"
-    },
-    {
       "path": "modules/Misc/SkinChanger.lua",
       "category": "Misc",
       "name": "SkinChanger"
@@ -34,11 +29,6 @@
       "path": "modules/Player/HitSound.lua",
       "category": "Player",
       "name": "HitSound"
-    },
-    {
-      "path": "modules/Movement/Fly.lua",
-      "category": "Movement",
-      "name": "Fly"
     },
     {
       "path": "modules/Movement/BunnyHopV2.lua",
