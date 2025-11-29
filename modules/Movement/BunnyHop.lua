@@ -9,7 +9,7 @@ local VERSION = "BunnyHop v3.1 (No Friction)"
 print("[Module] Loaded: " .. VERSION)
 
 local module = {
-    Name     = "BunnyHop (Space)",
+    Name     = "BunnyHop Legit",
     Category = "Movement",
     Enabled  = false,
 }
