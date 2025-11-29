@@ -44,11 +44,6 @@
       "path": "modules/Movement/BunnyHop.lua",
       "category": "Movement",
       "name": "BunnyHop Legit"
-    },
-    {
-      "path": "modules/Visuals/AntiFlash.lua",
-      "category": "Visuals",
-      "name": "AntiFlash"
     }
   ]
 }
