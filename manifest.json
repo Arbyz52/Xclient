@@ -26,6 +26,11 @@
       "name": "GrenadePredictor"
     },
     {
+      "path": "modules/Movement/HitSound.lua",
+      "category": "Player",
+      "name": "HitSound"
+    },
+    {
       "path": "modules/Movement/Fly.lua",
       "category": "Movement",
       "name": "Fly"
