@@ -29,6 +29,11 @@
       "path": "modules/Movement/Fly.lua",
       "category": "Movement",
       "name": "Fly"
+    },
+    {
+      "path": "modules/Combat/AimBot.lua",
+      "category": "Combat",
+      "name": "AimBot"
     }
   ]
 }
