@@ -3,7 +3,7 @@ local module = {
     Category = "Visuals",
     Enabled  = false,
 
-    _data        = {},   -- [player] = {humanoid, character, nameTagGui, nameTagLabel, lastColor}
+    _data        = {},
     _connections = {},
 }
 
@@ -11,8 +11,6 @@ local Players     = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService  = game:GetService("RunService")
 local CoreGui     = game:GetService("CoreGui")
-
--- ========= УТИЛИТЫ =========
 
 local function disconnect(conn)
     if conn then pcall(function() conn:Disconnect() end) end
@@ -46,7 +44,6 @@ local function destroyPlayerData(player)
     module._data[player] = nil
 end
 
--- ========= ЛОГИКА КОМАНД =========
 
 local function isEnemy(player)
     if player == LocalPlayer then return false end
@@ -69,7 +66,7 @@ local function getHealthColor(ratio)
     end
 end
 
--- ========= СОЗДАНИЕ НЕЙМТАГА =========
+
 
 local function createNameTag(player, character, humanoid, startColor)
     local head = character:FindFirstChild("Head")
@@ -107,7 +104,7 @@ local function createNameTag(player, character, humanoid, startColor)
     return tagGui, label
 end
 
--- ========= НАСТРОЙКА ЧАРА =========
+
 
 local function setupCharacter(player, character)
     if not character then return end
@@ -145,12 +142,12 @@ local function setupCharacter(player, character)
         lastColor    = col,
     }
 
-    -- удаляем при смерти
+
     addConnection("Died_" .. player.UserId, hum.Died:Connect(function()
         destroyPlayerData(player)
     end))
 
-    -- удаляем при удалении модели
+
     addConnection("CharRemoved_" .. player.UserId, character.AncestryChanged:Connect(function(_, parent)
         if not parent then destroyPlayerData(player) end
     end))
@@ -181,7 +178,7 @@ local function onPlayerRemoving(player)
     destroyPlayerData(player)
 end
 
--- ========= ОБНОВЛЕНИЕ =========
+
 
 local LERP_SPEED = 10
 
@@ -191,7 +188,7 @@ local function updateAll(dt)
         local label = info.nameTagLabel
         local char = info.character
 
-        -- если персонаж удалён или здоровье <= 0
+
         if not hum or hum.Parent == nil or not char or char.Parent == nil or hum.Health <= 0 then
             destroyPlayerData(player)
         elseif label and hum.MaxHealth > 0 then
@@ -212,7 +209,7 @@ local function updateAll(dt)
     end
 end
 
--- ========= МОДУЛЬНЫЕ МЕТОДЫ =========
+
 
 function module:Init()
     self._data = {}
