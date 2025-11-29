@@ -4,6 +4,10 @@ local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 
+-- ==================== Версия ====================
+local VERSION = "BunnyHop v1.0.0"
+print("[Module] Loaded: " .. VERSION)
+
 local module = {
     Name     = "BunnyHop (Space)",
     Category = "Movement",
