@@ -34,6 +34,11 @@
       "path": "modules/Combat/AimBot.lua",
       "category": "Combat",
       "name": "AimBot (Alt)"
+    },
+    {
+      "path": "modules/Movement/BunnyHop.lua",
+      "category": "Movement",
+      "name": "BunnyHop"
     }
   ]
 }
