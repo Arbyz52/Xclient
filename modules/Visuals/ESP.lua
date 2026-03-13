@@ -2,50 +2,47 @@ local module = {
 	Name     = "ESP",
 	Category = "Visuals",
 	Enabled  = false,
-	_objects     = {},   -- model → entry
+	_objects     = {},
 	_connections = {},
 	_npcTimer    = 0,
 }
 
---// Сервисы
 local Players      = game:GetService("Players")
 local LocalPlayer  = Players.LocalPlayer
 local RunService   = game:GetService("RunService")
 
---// Проверка Drawing API (нужен эксплоит с поддержкой)
 local HAS_DRAWING = pcall(function()
 	local t = Drawing.new("Line"); t:Remove()
 end)
 
--- ════════════════════════════════════════════════
---  НАСТРОЙКИ  (меняй под себя)
--- ════════════════════════════════════════════════
+-- ═══════════════════════════════════════
+--  НАСТРОЙКИ
+-- ═══════════════════════════════════════
 local CFG = {
-	ShowBox       = true,        -- 2D-рамка
-	ShowName      = true,        -- имя
-	ShowHealthBar = true,        -- полоска HP слева
-	ShowDistance   = true,        -- дистанция снизу
-	ShowTracer    = false,       -- линия от низа экрана
-	ShowHighlight = true,        -- 3D Highlight (через стены)
-	ShowNPCs      = true,        -- показывать NPC / ботов
+	ShowBox       = true,
+	ShowName      = true,
+	ShowHealthBar = true,
+	ShowTracer    = false,
+	ShowHighlight = true,
+	ShowNPCs      = true,
 
-	TeamCheck     = false,       -- true = не показывать союзников
-	MaxDistance    = 5000,        -- макс. дистанция (studs)
-	NPCScanRate   = 2,           -- интервал пересканирования NPC (сек)
+	TeamCheck     = true,
+	MaxDistance    = 5000,
+	NPCScanRate   = 2,
 
-	TextSize      = 13,
-	BoxThickness  = 1,
+	TextSize      = 15,
+	BoxThickness  = 1.5,
 
-	HLFillAlpha   = 0.75,       -- прозрачность заливки Highlight
-	HLOutAlpha    = 0,           -- прозрачность обводки Highlight
+	HLFillAlpha   = 0.75,
+	HLOutAlpha    = 0,
 
-	EnemyColor    = Color3.fromRGB(255, 55, 55),
-	NPCColor      = Color3.fromRGB(255, 170, 40),
+	EnemyColor    = Color3.fromRGB(255, 50, 50),
+	BotColor      = Color3.fromRGB(255, 170, 40),
 }
 
--- ════════════════════════════════════════════════
+-- ═══════════════════════════════════════
 --  УТИЛИТЫ
--- ════════════════════════════════════════════════
+-- ═══════════════════════════════════════
 local function safeDC(c)
 	if c then pcall(function() c:Disconnect() end) end
 end
@@ -64,20 +61,60 @@ local function healthColor(r)
 end
 
 local function isAlly(player)
-	if not CFG.TeamCheck then return false end
 	if not player then return false end
+	if player == LocalPlayer then return true end
+	if not CFG.TeamCheck then return false end
 	local mt, pt = LocalPlayer.Team, player.Team
 	if not mt or not pt then return false end
 	return mt == pt
 end
 
--- ════════════════════════════════════════════════
---  DRAWING
--- ════════════════════════════════════════════════
+-- Проверяем, является ли NPC "своим" (та же команда через TeamColor/объект Team)
+local function isAllyNPC(model)
+	if not CFG.TeamCheck then return false end
+	if not model then return false end
+
+	-- Проверка через атрибут Team / TeamColor на модели или Humanoid
+	local myTeam = LocalPlayer.Team
+	if not myTeam then return false end
+
+	-- Некоторые игры ставят TeamColor на модель
+	local tc = model:FindFirstChild("TeamColor")
+	if tc and tc:IsA("ValueBase") then
+		pcall(function()
+			if tc.Value == myTeam.TeamColor then return true end
+		end)
+	end
+
+	-- Проверяем папку — если бот лежит в папке с именем команды
+	local parent = model.Parent
+	if parent and parent.Name == myTeam.Name then
+		return true
+	end
+
+	return false
+end
+
+-- ═══════════════════════════════════════
+--  DRAWINGS  (жирный текст = 2 слоя)
+-- ═══════════════════════════════════════
+local function makeText(size)
+	local t = Drawing.new("Text")
+	t.Size         = size
+	t.Font         = 2       -- Plex — самый читабельный
+	t.Center       = true
+	t.Outline      = true
+	t.OutlineColor = Color3.new(0, 0, 0)
+	t.Transparency = 1
+	t.Visible      = false
+	return t
+end
+
 local function createDrawings()
 	if not HAS_DRAWING then return nil end
 	local d = {}
 
+	-- Рамка (двойная: чёрный контур + цветная)
 	d.boxOut = Drawing.new("Square")
 	d.boxOut.Thickness    = 3
 	d.boxOut.Color        = Color3.new(0, 0, 0)
@@ -91,29 +128,16 @@ local function createDrawings()
 	d.box.Filled       = false
 	d.box.Visible      = false
 
-	d.name = Drawing.new("Text")
-	d.name.Size         = CFG.TextSize
-	d.name.Font         = 2
-	d.name.Center       = true
-	d.name.Outline      = true
-	d.name.OutlineColor = Color3.new(0, 0, 0)
-	d.name.Transparency = 1
-	d.name.Visible      = false
+	-- Жирное имя: 3 слоя текста с небольшим смещением
+	d.name1 = makeText(CFG.TextSize)
+	d.name2 = makeText(CFG.TextSize)
+	d.name3 = makeText(CFG.TextSize)
 
-	d.dist = Drawing.new("Text")
-	d.dist.Size         = CFG.TextSize - 1
-	d.dist.Font         = 2
-	d.dist.Center       = true
-	d.dist.Outline      = true
-	d.dist.OutlineColor = Color3.new(0, 0, 0)
-	d.dist.Color        = Color3.fromRGB(200, 200, 200)
-	d.dist.Transparency = 1
-	d.dist.Visible      = false
-
+	-- HP бар
 	d.hpBg = Drawing.new("Square")
 	d.hpBg.Filled       = true
-	d.hpBg.Color        = Color3.new(0, 0, 0)
-	d.hpBg.Transparency = 0.5
+	d.hpBg.Color        = Color3.fromRGB(15, 15, 15)
+	d.hpBg.Transparency = 0.35
 	d.hpBg.Visible      = false
 
 	d.hpOut = Drawing.new("Square")
@@ -128,6 +152,7 @@ local function createDrawings()
 	d.hpFill.Transparency = 1
 	d.hpFill.Visible      = false
 
+	-- Трейсер
 	d.tracer = Drawing.new("Line")
 	d.tracer.Thickness    = 1
 	d.tracer.Transparency = 1
@@ -146,9 +171,9 @@ local function hideDrawings(d)
 	for _, o in pairs(d) do pcall(function() o.Visible = false end) end
 end
 
--- ════════════════════════════════════════════════
---  ENTRY  (создание / удаление)
--- ════════════════════════════════════════════════
+-- ═══════════════════════════════════════
+--  ENTRY
+-- ═══════════════════════════════════════
 local function destroyEntry(model)
 	local e = module._objects[model]
 	if not e then return end
@@ -161,24 +186,27 @@ local function addEntity(model, player)
 	if not model then return end
 	if model == LocalPlayer.Character then return end
 	if module._objects[model] then return end
-	if player and (player == LocalPlayer or isAlly(player)) then return end
+	if player and isAlly(player) then return end
+	if not player and isAllyNPC(model) then return end
 
+	local isNPC = (player == nil)
 	local displayName
-	if player then
-		displayName = player.DisplayName or player.Name
+	if isNPC then
+		displayName = "BOT"
 	else
-		displayName = "[NPC] " .. model.Name
+		displayName = player.DisplayName or player.Name
 	end
 
 	local entry = {
-		model = model,
+		model  = model,
 		player = player,
-		isNPC  = (player == nil),
+		isNPC  = isNPC,
 		name   = displayName,
 		draw   = createDrawings(),
 		hl     = nil,
 	}
 
+	-- Highlight
 	if CFG.ShowHighlight then
 		pcall(function()
 			for _, ch in ipairs(model:GetChildren()) do
@@ -187,12 +215,12 @@ local function addEntity(model, player)
 				end
 			end
 			local h = Instance.new("Highlight")
-			h.Name               = "__ESP"
-			h.Adornee            = model
-			h.DepthMode          = Enum.HighlightDepthMode.AlwaysOnTop
-			h.FillTransparency   = CFG.HLFillAlpha
-			h.OutlineTransparency= CFG.HLOutAlpha
-			local c = entry.isNPC and CFG.NPCColor or CFG.EnemyColor
+			h.Name                = "__ESP"
+			h.Adornee             = model
+			h.DepthMode           = Enum.HighlightDepthMode.AlwaysOnTop
+			h.FillTransparency    = CFG.HLFillAlpha
+			h.OutlineTransparency = CFG.HLOutAlpha
+			local c = isNPC and CFG.BotColor or CFG.EnemyColor
 			h.FillColor    = c
 			h.OutlineColor = c
 			h.Parent       = model
@@ -203,9 +231,9 @@ local function addEntity(model, player)
 	module._objects[model] = entry
 end
 
--- ════════════════════════════════════════════════
---  РЕНДЕР  (обновление каждого кадра)
--- ════════════════════════════════════════════════
+-- ═══════════════════════════════════════
+--  РЕНДЕР
+-- ═══════════════════════════════════════
 local function updateEntry(entry)
 	local model = entry.model
 	if not model or not model.Parent then
@@ -213,8 +241,13 @@ local function updateEntry(entry)
 		return false
 	end
 
-	-- Если это игрок который ушёл
 	if entry.player and not entry.player.Parent then
+		hideDrawings(entry.draw)
+		return false
+	end
+
+	-- Перепроверка союзника (смена команды)
+	if entry.player and isAlly(entry.player) then
 		hideDrawings(entry.draw)
 		return false
 	end
@@ -240,7 +273,7 @@ local function updateEntry(entry)
 		return true
 	end
 
-	-- Дистанция
+	-- Дистанция (для отсечения)
 	local myChar = LocalPlayer.Character
 	local myRoot = myChar and (
 		myChar:FindFirstChild("HumanoidRootPart")
@@ -257,11 +290,10 @@ local function updateEntry(entry)
 		if entry.hl then pcall(function() entry.hl.Enabled = true end) end
 	end
 
-	-- На экране?
 	local _, onScreen = camera:WorldToViewportPoint(root.Position)
 	if not onScreen then
 		hideDrawings(entry.draw)
-		return true   -- highlight остаётся видимым
+		return true
 	end
 
 	-- ── Bounding box ──
@@ -294,85 +326,89 @@ local function updateEntry(entry)
 	local boxX = cx - boxW / 2
 	local boxY = topV.Y
 
-	-- Цвета
-	local entityCol = entry.isNPC and CFG.NPCColor or CFG.EnemyColor
+	local entityCol = entry.isNPC and CFG.BotColor or CFG.EnemyColor
 	local hpRatio   = math.clamp(humanoid.Health / math.max(humanoid.MaxHealth, 1), 0, 1)
 	local hpCol     = healthColor(hpRatio)
 
-	-- ── Рисуем ──
 	local d = entry.draw
-	if d then
-		-- Рамка
-		if CFG.ShowBox then
-			d.boxOut.Position = Vector2.new(boxX, boxY)
-			d.boxOut.Size     = Vector2.new(boxW, boxH)
-			d.boxOut.Visible  = true
+	if not d then return true end
 
-			d.box.Position = Vector2.new(boxX, boxY)
-			d.box.Size     = Vector2.new(boxW, boxH)
-			d.box.Color    = entityCol
-			d.box.Visible  = true
-		else
-			d.boxOut.Visible = false
-			d.box.Visible    = false
-		end
+	-- ── Рамка ──
+	if CFG.ShowBox then
+		d.boxOut.Position = Vector2.new(boxX, boxY)
+		d.boxOut.Size     = Vector2.new(boxW, boxH)
+		d.boxOut.Visible  = true
 
-		-- Имя
-		if CFG.ShowName then
-			d.name.Text     = entry.name
-			d.name.Position = Vector2.new(cx, boxY - CFG.TextSize - 3)
-			d.name.Color    = entityCol
-			d.name.Visible  = true
-		else
-			d.name.Visible = false
-		end
-
-		-- Дистанция
-		if CFG.ShowDistance then
-			d.dist.Text     = math.floor(distance) .. "m"
-			d.dist.Position = Vector2.new(cx, boxY + boxH + 2)
-			d.dist.Visible  = true
-		else
-			d.dist.Visible = false
-		end
-
-		-- Полоска HP
-		if CFG.ShowHealthBar then
-			local bw = 3
-			local bx = boxX - bw - 3
-
-			d.hpBg.Position  = Vector2.new(bx - 1, boxY - 1)
-			d.hpBg.Size      = Vector2.new(bw + 2, boxH + 2)
-			d.hpBg.Visible   = true
-
-			d.hpOut.Position = Vector2.new(bx - 1, boxY - 1)
-			d.hpOut.Size     = Vector2.new(bw + 2, boxH + 2)
-			d.hpOut.Visible  = true
-
-			local fillH = math.max(boxH * hpRatio, 1)
-			d.hpFill.Position = Vector2.new(bx, boxY + (boxH - fillH))
-			d.hpFill.Size     = Vector2.new(bw, fillH)
-			d.hpFill.Color    = hpCol
-			d.hpFill.Visible  = true
-		else
-			d.hpBg.Visible   = false
-			d.hpOut.Visible  = false
-			d.hpFill.Visible = false
-		end
-
-		-- Трейсер
-		if CFG.ShowTracer then
-			local vs = camera.ViewportSize
-			d.tracer.From    = Vector2.new(vs.X / 2, vs.Y)
-			d.tracer.To      = Vector2.new(cx, boxY + boxH)
-			d.tracer.Color   = entityCol
-			d.tracer.Visible = true
-		else
-			d.tracer.Visible = false
-		end
+		d.box.Position = Vector2.new(boxX, boxY)
+		d.box.Size     = Vector2.new(boxW, boxH)
+		d.box.Color    = entityCol
+		d.box.Visible  = true
+	else
+		d.boxOut.Visible = false
+		d.box.Visible    = false
 	end
 
-	-- Highlight
+	-- ── Жирное имя (3 слоя для bold-эффекта) ──
+	if CFG.ShowName then
+		local nameY = boxY - CFG.TextSize - 4
+		local txt   = entry.name
+
+		d.name1.Text     = txt
+		d.name1.Position = Vector2.new(cx, nameY)
+		d.name1.Color    = entityCol
+		d.name1.Visible  = true
+
+		d.name2.Text     = txt
+		d.name2.Position = Vector2.new(cx + 1, nameY)
+		d.name2.Color    = entityCol
+		d.name2.Visible  = true
+
+		d.name3.Text     = txt
+		d.name3.Position = Vector2.new(cx - 1, nameY)
+		d.name3.Color    = entityCol
+		d.name3.Visible  = true
+	else
+		d.name1.Visible = false
+		d.name2.Visible = false
+		d.name3.Visible = false
+	end
+
+	-- ── HP бар ──
+	if CFG.ShowHealthBar then
+		local bw = 3
+		local bx = boxX - bw - 3
+
+		d.hpBg.Position  = Vector2.new(bx - 1, boxY - 1)
+		d.hpBg.Size      = Vector2.new(bw + 2, boxH + 2)
+		d.hpBg.Visible   = true
+
+		d.hpOut.Position = Vector2.new(bx - 1, boxY - 1)
+		d.hpOut.Size     = Vector2.new(bw + 2, boxH + 2)
+		d.hpOut.Visible  = true
+
+		local fillH = math.max(boxH * hpRatio, 1)
+		d.hpFill.Position = Vector2.new(bx, boxY + (boxH - fillH))
+		d.hpFill.Size     = Vector2.new(bw, fillH)
+		d.hpFill.Color    = hpCol
+		d.hpFill.Visible  = true
+	else
+		d.hpBg.Visible   = false
+		d.hpOut.Visible  = false
+		d.hpFill.Visible = false
+	end
+
+	-- ── Трейсер ──
+	if CFG.ShowTracer then
+		local vs = camera.ViewportSize
+		d.tracer.From    = Vector2.new(vs.X / 2, vs.Y)
+		d.tracer.To      = Vector2.new(cx, boxY + boxH)
+		d.tracer.Color   = entityCol
+		d.tracer.Visible = true
+	else
+		d.tracer.Visible = false
+	end
+
+	-- Highlight цвет
 	if entry.hl then
 		entry.hl.OutlineColor = entityCol
 		entry.hl.FillColor    = entityCol
@@ -381,9 +417,9 @@ local function updateEntry(entry)
 	return true
 end
 
--- ════════════════════════════════════════════════
+-- ═══════════════════════════════════════
 --  СКАНЕР NPC
--- ════════════════════════════════════════════════
+-- ═══════════════════════════════════════
 local function scanNPCs()
 	if not CFG.ShowNPCs or not module.Enabled then return end
 
@@ -399,6 +435,7 @@ local function scanNPCs()
 				and m ~= LocalPlayer.Character
 				and not playerChars[m]
 				and not module._objects[m]
+				and not isAllyNPC(m)
 			then
 				addEntity(m, nil)
 			end
@@ -406,9 +443,9 @@ local function scanNPCs()
 	end
 end
 
--- ════════════════════════════════════════════════
+-- ═══════════════════════════════════════
 --  ТРЕКИНГ ИГРОКОВ
--- ════════════════════════════════════════════════
+-- ═══════════════════════════════════════
 local function removePlayerEntry(player)
 	for model, entry in pairs(module._objects) do
 		if entry.player == player then
@@ -423,7 +460,6 @@ local function setupPlayer(player)
 
 	local function onCharAdded(character)
 		removePlayerEntry(player)
-
 		task.defer(function()
 			if not module.Enabled then return end
 			if not character or not character.Parent then return end
@@ -458,9 +494,9 @@ local function setupPlayer(player)
 	end
 end
 
--- ════════════════════════════════════════════════
+-- ═══════════════════════════════════════
 --  MODULE API
--- ════════════════════════════════════════════════
+-- ═══════════════════════════════════════
 function module:Init()
 	self._objects     = {}
 	self._connections = {}
@@ -472,17 +508,14 @@ function module:OnEnable()
 	self._objects  = {}
 	self._npcTimer = 0
 
-	-- Обработка существующих игроков
 	for _, player in ipairs(Players:GetPlayers()) do
 		setupPlayer(player)
 	end
 
-	-- Новые игроки
 	storeConn("playerAdded", Players.PlayerAdded:Connect(function(player)
 		setupPlayer(player)
 	end))
 
-	-- Игрок вышел
 	storeConn("playerRemoving", Players.PlayerRemoving:Connect(function(player)
 		removePlayerEntry(player)
 		safeDC(module._connections["char_" .. player.UserId])
@@ -491,11 +524,9 @@ function module:OnEnable()
 		module._connections["team_" .. player.UserId] = nil
 	end))
 
-	-- Автодетект NPC при добавлении в workspace
 	storeConn("descAdded", workspace.DescendantAdded:Connect(function(desc)
 		if not module.Enabled or not CFG.ShowNPCs then return end
 		if not desc:IsA("Humanoid") then return end
-
 		task.defer(function()
 			if not module.Enabled then return end
 			local m = desc.Parent
@@ -503,13 +534,13 @@ function module:OnEnable()
 			for _, p in ipairs(Players:GetPlayers()) do
 				if p.Character == m then return end
 			end
+			if isAllyNPC(m) then return end
 			if desc.Health > 0 and not module._objects[m] then
 				addEntity(m, nil)
 			end
 		end)
 	end))
 
-	-- Удаление NPC из workspace
 	storeConn("descRemoving", workspace.DescendantRemoving:Connect(function(desc)
 		if desc:IsA("Model") and module._objects[desc] then
 			destroyEntry(desc)
@@ -521,10 +552,32 @@ function module:OnEnable()
 		end
 	end))
 
-	-- Первоначальный скан NPC
+	-- Рескан при смене своей команды
+	storeConn("myTeam", LocalPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+		if not module.Enabled then return end
+		task.defer(function()
+			-- Убираем тех, кто стал союзником; добавляем тех, кто стал врагом
+			for model, entry in pairs(module._objects) do
+				if entry.player and isAlly(entry.player) then
+					destroyEntry(model)
+				elseif entry.isNPC and isAllyNPC(model) then
+					destroyEntry(model)
+				end
+			end
+			-- Пересканируем
+			for _, player in ipairs(Players:GetPlayers()) do
+				if player ~= LocalPlayer and not isAlly(player) and player.Character then
+					if not module._objects[player.Character] then
+						addEntity(player.Character, player)
+					end
+				end
+			end
+			scanNPCs()
+		end)
+	end))
+
 	task.defer(scanNPCs)
 
-	-- Главный цикл рендера
 	storeConn("render", RunService.RenderStepped:Connect(function(dt)
 		if not module.Enabled then return end
 
@@ -534,12 +587,10 @@ function module:OnEnable()
 				table.insert(toRemove, model)
 			end
 		end
-
 		for _, model in ipairs(toRemove) do
 			destroyEntry(model)
 		end
 
-		-- Периодический рескан NPC
 		module._npcTimer = module._npcTimer + dt
 		if module._npcTimer >= CFG.NPCScanRate then
 			module._npcTimer = 0
