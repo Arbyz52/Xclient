@@ -6,6 +6,7 @@ local module = {
 	_objects = {},
 	_connections = {},
 	_npcTimer = 0,
+	_playerCharacters = {},
 }
 
 local Players = game:GetService("Players")
@@ -15,8 +16,8 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
 local HAS_DRAWING = pcall(function()
-	local x = Drawing.new("Line")
-	x:Remove()
+	local l = Drawing.new("Line")
+	l:Remove()
 end)
 
 local CFG = {
@@ -28,17 +29,19 @@ local CFG = {
 	ShowNPCs = true,
 
 	TeamCheck = true,
-	MaxDistance = 5000,
-	NPCScanRate = 2,
+	MaxDistance = 2500,
+	NPCScanRate = 4,
 
-	TextSize = 15,
+	TextSize = 14,
 	BoxThickness = 1.5,
+	CornerScale = 0.22,
 
-	HLFillAlpha = 0.75,
+	HLFillAlpha = 0.8,
 	HLOutAlpha = 0,
 
-	EnemyColor = Color3.fromRGB(255, 50, 50),
-	BotColor = Color3.fromRGB(255, 170, 40),
+	EnemyColor = Color3.fromRGB(255, 70, 70),
+	BotColor = Color3.fromRGB(255, 180, 60),
+	TextColor = Color3.fromRGB(255, 255, 255),
 }
 
 local function disconnect(conn)
@@ -49,42 +52,36 @@ local function disconnect(conn)
 	end
 end
 
-local function setConnection(key, conn)
+local function bind(key, conn)
 	disconnect(module._connections[key])
 	module._connections[key] = conn
 end
 
-local function healthColor(ratio)
-	ratio = math.clamp(ratio, 0, 1)
-
-	if ratio > 0.5 then
-		return Color3.fromRGB((1 - ratio) * 2 * 255, 255, 0)
-	else
-		return Color3.fromRGB(255, ratio * 2 * 255, 0)
+local function hpColor(r)
+	r = math.clamp(r, 0, 1)
+	if r > 0.5 then
+		return Color3.fromRGB((1 - r) * 2 * 255, 255, 0)
 	end
+	return Color3.fromRGB(255, r * 2 * 255, 0)
 end
 
-local function isPlayerAlly(player)
+local function isAlly(player)
 	if not player then
 		return false
 	end
-
 	if player == LocalPlayer then
 		return true
 	end
-
 	if not CFG.TeamCheck then
 		return false
 	end
-
 	if not LocalPlayer.Team or not player.Team then
 		return false
 	end
-
 	return LocalPlayer.Team == player.Team
 end
 
-local function isNPCAlly(model)
+local function isAllyNPC(model)
 	if not CFG.TeamCheck or not model then
 		return false
 	end
@@ -100,25 +97,8 @@ local function isNPCAlly(model)
 	end
 
 	local teamColor = model:FindFirstChild("TeamColor")
-	if teamColor and teamColor:IsA("BrickColorValue") then
-		if teamColor.Value == myTeam.TeamColor then
-			return true
-		end
-	end
-
-	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		local humTeam = humanoid:FindFirstChild("Team")
-		if humTeam and humTeam:IsA("ObjectValue") and humTeam.Value == myTeam then
-			return true
-		end
-
-		local humTeamColor = humanoid:FindFirstChild("TeamColor")
-		if humTeamColor and humTeamColor:IsA("BrickColorValue") then
-			if humTeamColor.Value == myTeam.TeamColor then
-				return true
-			end
-		end
+	if teamColor and teamColor:IsA("BrickColorValue") and teamColor.Value == myTeam.TeamColor then
+		return true
 	end
 
 	local parent = model.Parent
@@ -129,9 +109,61 @@ local function isNPCAlly(model)
 	return false
 end
 
-local function makeText(size)
+local function getHumanoid(model)
+	return model and model:FindFirstChildOfClass("Humanoid")
+end
+
+local function getRoot(model)
+	return model and (
+		model:FindFirstChild("HumanoidRootPart")
+		or model:FindFirstChild("UpperTorso")
+		or model:FindFirstChild("Torso")
+		or model:FindFirstChild("Head")
+	)
+end
+
+local function getLocalRoot()
+	local char = LocalPlayer.Character
+	if not char then
+		return nil
+	end
+	return getRoot(char)
+end
+
+local function hide(tbl)
+	if not tbl then
+		return
+	end
+	for _, obj in pairs(tbl) do
+		pcall(function()
+			obj.Visible = false
+		end)
+	end
+end
+
+local function remove(tbl)
+	if not tbl then
+		return
+	end
+	for _, obj in pairs(tbl) do
+		pcall(function()
+			obj:Remove()
+		end)
+	end
+end
+
+local function makeLine(thickness, color)
+	local l = Drawing.new("Line")
+	l.Thickness = thickness or 1
+	l.Color = color or Color3.new(1, 1, 1)
+	l.Transparency = 1
+	l.Visible = false
+	return l
+end
+
+local function makeText()
 	local t = Drawing.new("Text")
-	t.Size = size
+	t.Size = CFG.TextSize
 	t.Font = 2
 	t.Center = true
 	t.Outline = true
@@ -141,103 +173,61 @@ local function makeText(size)
 	return t
 end
 
-local function createDrawings()
+local function createCornerBox()
 	if not HAS_DRAWING then
 		return nil
 	end
 
-	local d = {}
+	local d = {
+		name = makeText(),
 
-	d.boxOutline = Drawing.new("Square")
-	d.boxOutline.Thickness = 3
-	d.boxOutline.Color = Color3.new(0, 0, 0)
-	d.boxOutline.Filled = false
-	d.boxOutline.Transparency = 1
-	d.boxOutline.Visible = false
+		hpBg = Drawing.new("Square"),
+		hpFill = Drawing.new("Square"),
 
-	d.box = Drawing.new("Square")
-	d.box.Thickness = CFG.BoxThickness
-	d.box.Filled = false
-	d.box.Transparency = 1
-	d.box.Visible = false
+		tracer = makeLine(1),
 
-	d.name1 = makeText(CFG.TextSize)
-	d.name2 = makeText(CFG.TextSize)
-	d.name3 = makeText(CFG.TextSize)
+		corners = {},
+		cornersOutline = {},
+	}
 
-	d.hpBg = Drawing.new("Square")
+	for i = 1, 8 do
+		d.corners[i] = makeLine(CFG.BoxThickness)
+		d.cornersOutline[i] = makeLine(CFG.BoxThickness + 2, Color3.new(0, 0, 0))
+	end
+
 	d.hpBg.Filled = true
-	d.hpBg.Color = Color3.fromRGB(15, 15, 15)
+	d.hpBg.Color = Color3.fromRGB(20, 20, 20)
 	d.hpBg.Transparency = 0.35
 	d.hpBg.Visible = false
 
-	d.hpOutline = Drawing.new("Square")
-	d.hpOutline.Filled = false
-	d.hpOutline.Color = Color3.new(0, 0, 0)
-	d.hpOutline.Thickness = 1
-	d.hpOutline.Transparency = 1
-	d.hpOutline.Visible = false
-
-	d.hpFill = Drawing.new("Square")
 	d.hpFill.Filled = true
 	d.hpFill.Transparency = 1
 	d.hpFill.Visible = false
 
-	d.tracer = Drawing.new("Line")
-	d.tracer.Thickness = 1
-	d.tracer.Transparency = 1
-	d.tracer.Visible = false
-
 	return d
 end
 
-local function hideDrawings(draw)
-	if not draw then
-		return
+local function setLine(line, from, to, color)
+	line.From = from
+	line.To = to
+	if color then
+		line.Color = color
 	end
-
-	for _, obj in pairs(draw) do
-		pcall(function()
-			obj.Visible = false
-		end)
-	end
+	line.Visible = true
 end
 
-local function removeDrawings(draw)
-	if not draw then
-		return
-	end
+local function drawCornerSet(lines, x, y, w, h, len, color)
+	setLine(lines[1], Vector2.new(x, y), Vector2.new(x + len, y), color)
+	setLine(lines[2], Vector2.new(x, y), Vector2.new(x, y + len), color)
 
-	for _, obj in pairs(draw) do
-		pcall(function()
-			obj:Remove()
-		end)
-	end
-end
+	setLine(lines[3], Vector2.new(x + w - len, y), Vector2.new(x + w, y), color)
+	setLine(lines[4], Vector2.new(x + w, y), Vector2.new(x + w, y + len), color)
 
-local function getCharacterRoot(model)
-	return model:FindFirstChild("HumanoidRootPart")
-		or model:FindFirstChild("UpperTorso")
-		or model:FindFirstChild("Torso")
-		or model:FindFirstChild("Head")
-end
+	setLine(lines[5], Vector2.new(x, y + h - len), Vector2.new(x, y + h), color)
+	setLine(lines[6], Vector2.new(x, y + h), Vector2.new(x + len, y + h), color)
 
-local function getHumanoid(model)
-	return model and model:FindFirstChildOfClass("Humanoid")
-end
-
-local function getDistanceFromLocal(pos)
-	local char = LocalPlayer.Character
-	if not char then
-		return math.huge
-	end
-
-	local root = getCharacterRoot(char)
-	if not root then
-		return math.huge
-	end
-
-	return (root.Position - pos).Magnitude
+	setLine(lines[7], Vector2.new(x + w - len, y + h), Vector2.new(x + w, y + h), color)
+	setLine(lines[8], Vector2.new(x + w, y + h - len), Vector2.new(x + w, y + h), color)
 end
 
 local function destroyEntry(model)
@@ -246,8 +236,8 @@ local function destroyEntry(model)
 		return
 	end
 
-	hideDrawings(entry.draw)
-	removeDrawings(entry.draw)
+	hide(entry.draw)
+	remove(entry.draw)
 
 	if entry.highlight then
 		pcall(function()
@@ -259,14 +249,18 @@ local function destroyEntry(model)
 end
 
 local function createHighlight(model, color)
-	local ok, hl = pcall(function()
-		local old = model:FindFirstChild("__ESPHighlight")
-		if old and old:IsA("Highlight") then
+	if not CFG.ShowHighlight then
+		return nil
+	end
+
+	local ok, result = pcall(function()
+		local old = model:FindFirstChild("__ESP_HL")
+		if old then
 			old:Destroy()
 		end
 
 		local h = Instance.new("Highlight")
-		h.Name = "__ESPHighlight"
+		h.Name = "__ESP_HL"
 		h.Adornee = model
 		h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 		h.FillTransparency = CFG.HLFillAlpha
@@ -277,7 +271,7 @@ local function createHighlight(model, color)
 		return h
 	end)
 
-	return ok and hl or nil
+	return ok and result or nil
 end
 
 local function addEntity(model, player)
@@ -290,11 +284,11 @@ local function addEntity(model, player)
 	end
 
 	if player then
-		if isPlayerAlly(player) then
+		if isAlly(player) then
 			return
 		end
 	else
-		if isNPCAlly(model) then
+		if isAllyNPC(model) then
 			return
 		end
 	end
@@ -302,45 +296,72 @@ local function addEntity(model, player)
 	local isNPC = player == nil
 	local color = isNPC and CFG.BotColor or CFG.EnemyColor
 
-	local entry = {
+	module._objects[model] = {
 		model = model,
 		player = player,
 		isNPC = isNPC,
-		name = isNPC and "BOT" or (player.DisplayName or player.Name),
-		draw = createDrawings(),
-		highlight = nil,
+		name = isNPC and model.Name or (player.DisplayName or player.Name),
+		draw = createCornerBox(),
+		highlight = createHighlight(model, color),
+		color = color,
 	}
-
-	if CFG.ShowHighlight then
-		entry.highlight = createHighlight(model, color)
-	end
-
-	module._objects[model] = entry
 end
 
-local function getBoxPoints(model, root, camera)
+local function updateCorners(draw, x, y, w, h, color)
+	local len = math.max(6, math.floor(math.min(w, h) * CFG.CornerScale))
+
+	drawCornerSet(draw.cornersOutline, x, y, w, h, len, Color3.new(0, 0, 0))
+	drawCornerSet(draw.corners, x, y, w, h, len, color)
+end
+
+local function getBox(root, model, camera)
 	local head = model:FindFirstChild("Head")
+
+	local topPoint, bottomPoint
 
 	if head then
 		local top = camera:WorldToViewportPoint((head.CFrame * CFrame.new(0, 0.8, 0)).Position)
 		local bottom = camera:WorldToViewportPoint((root.CFrame * CFrame.new(0, -3, 0)).Position)
 
 		if top.Z > 0 and bottom.Z > 0 then
-			return Vector2.new(top.X, top.Y), Vector2.new(bottom.X, bottom.Y)
+			topPoint = Vector2.new(top.X, top.Y)
+			bottomPoint = Vector2.new(bottom.X, bottom.Y)
 		end
 	end
 
-	local top = camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3.5, 0))
-	local bottom = camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3.5, 0))
+	if not topPoint then
+		local top = camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3.2, 0))
+		local bottom = camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3.2, 0))
 
-	if top.Z <= 0 or bottom.Z <= 0 then
-		return nil, nil
+		if top.Z <= 0 or bottom.Z <= 0 then
+			return nil
+		end
+
+		topPoint = Vector2.new(top.X, top.Y)
+		bottomPoint = Vector2.new(bottom.X, bottom.Y)
 	end
 
-	return Vector2.new(top.X, top.Y), Vector2.new(bottom.X, bottom.Y)
+	local h = math.abs(bottomPoint.Y - topPoint.Y)
+	local w = h * 0.58
+	local cx = (topPoint.X + bottomPoint.X) * 0.5
+
+	return {
+		x = cx - w * 0.5,
+		y = topPoint.Y,
+		w = w,
+		h = h,
+		cx = cx,
+	}
 end
 
-local function updateEntry(entry)
+local function hideEntry(entry)
+	hide(entry.draw)
+	if entry.highlight then
+		entry.highlight.Enabled = false
+	end
+end
+
+local function updateEntry(entry, camera, localRoot)
 	local model = entry.model
 	if not model or not model.Parent then
 		return false
@@ -350,19 +371,13 @@ local function updateEntry(entry)
 		return false
 	end
 
-	if entry.player and isPlayerAlly(entry.player) then
-		hideDrawings(entry.draw)
-		if entry.highlight then
-			entry.highlight.Enabled = false
-		end
+	if entry.player and isAlly(entry.player) then
+		hideEntry(entry)
 		return true
 	end
 
-	if entry.isNPC and isNPCAlly(model) then
-		hideDrawings(entry.draw)
-		if entry.highlight then
-			entry.highlight.Enabled = false
-		end
+	if entry.isNPC and isAllyNPC(model) then
+		hideEntry(entry)
 		return true
 	end
 
@@ -371,145 +386,94 @@ local function updateEntry(entry)
 		return false
 	end
 
-	local root = getCharacterRoot(model)
+	local root = getRoot(model)
 	if not root then
-		hideDrawings(entry.draw)
+		hideEntry(entry)
 		return true
 	end
 
-	local camera = Workspace.CurrentCamera
-	if not camera then
-		hideDrawings(entry.draw)
-		return true
-	end
-
-	local distance = getDistanceFromLocal(root.Position)
+	local distance = localRoot and (root.Position - localRoot.Position).Magnitude or math.huge
 	if distance > CFG.MaxDistance then
-		hideDrawings(entry.draw)
-		if entry.highlight then
-			entry.highlight.Enabled = false
-		end
+		hideEntry(entry)
 		return true
 	end
 
-	local screenPoint, onScreen = camera:WorldToViewportPoint(root.Position)
-	if not onScreen or screenPoint.Z <= 0 then
-		hideDrawings(entry.draw)
-		if entry.highlight then
-			entry.highlight.Enabled = false
-		end
+	local pos, onScreen = camera:WorldToViewportPoint(root.Position)
+	if not onScreen or pos.Z <= 0 then
+		hideEntry(entry)
 		return true
 	end
 
-	local topV, bottomV = getBoxPoints(model, root, camera)
-	if not topV or not bottomV then
-		hideDrawings(entry.draw)
-		if entry.highlight then
-			entry.highlight.Enabled = false
-		end
+	local box = getBox(root, model, camera)
+	if not box then
+		hideEntry(entry)
 		return true
 	end
 
-	local boxH = math.abs(bottomV.Y - topV.Y)
-	local boxW = boxH * 0.55
-	local centerX = (topV.X + bottomV.X) * 0.5
-	local boxX = centerX - boxW * 0.5
-	local boxY = topV.Y
-
-	local color = entry.isNPC and CFG.BotColor or CFG.EnemyColor
+	local color = entry.color
+	local draw = entry.draw
 	local hpRatio = math.clamp(humanoid.Health / math.max(humanoid.MaxHealth, 1), 0, 1)
-	local hpCol = healthColor(hpRatio)
 
-	local d = entry.draw
-	if d then
-		if CFG.ShowBox then
-			d.boxOutline.Position = Vector2.new(boxX, boxY)
-			d.boxOutline.Size = Vector2.new(boxW, boxH)
-			d.boxOutline.Visible = true
-
-			d.box.Position = Vector2.new(boxX, boxY)
-			d.box.Size = Vector2.new(boxW, boxH)
-			d.box.Color = color
-			d.box.Visible = true
-		else
-			d.boxOutline.Visible = false
-			d.box.Visible = false
+	if CFG.ShowBox then
+		updateCorners(draw, box.x, box.y, box.w, box.h, color)
+	else
+		for i = 1, 8 do
+			draw.corners[i].Visible = false
+			draw.cornersOutline[i].Visible = false
 		end
+	end
 
-		if CFG.ShowName then
-			local nameY = boxY - CFG.TextSize - 4
-			local text = entry.name
+	if CFG.ShowName then
+		draw.name.Text = entry.name
+		draw.name.Position = Vector2.new(box.cx, box.y - 16)
+		draw.name.Color = CFG.TextColor
+		draw.name.Visible = true
+	else
+		draw.name.Visible = false
+	end
 
-			d.name1.Text = text
-			d.name1.Position = Vector2.new(centerX, nameY)
-			d.name1.Color = color
-			d.name1.Visible = true
+	if CFG.ShowHealthBar then
+		local bw = 3
+		local bx = box.x - 6
+		local fillH = math.max(1, box.h * hpRatio)
 
-			d.name2.Text = text
-			d.name2.Position = Vector2.new(centerX + 1, nameY)
-			d.name2.Color = color
-			d.name2.Visible = true
+		draw.hpBg.Position = Vector2.new(bx, box.y)
+		draw.hpBg.Size = Vector2.new(bw, box.h)
+		draw.hpBg.Visible = true
 
-			d.name3.Text = text
-			d.name3.Position = Vector2.new(centerX - 1, nameY)
-			d.name3.Color = color
-			d.name3.Visible = true
-		else
-			d.name1.Visible = false
-			d.name2.Visible = false
-			d.name3.Visible = false
-		end
+		draw.hpFill.Position = Vector2.new(bx, box.y + (box.h - fillH))
+		draw.hpFill.Size = Vector2.new(bw, fillH)
+		draw.hpFill.Color = hpColor(hpRatio)
+		draw.hpFill.Visible = true
+	else
+		draw.hpBg.Visible = false
+		draw.hpFill.Visible = false
+	end
 
-		if CFG.ShowHealthBar then
-			local bw = 3
-			local bx = boxX - bw - 3
-			local fillH = math.max(boxH * hpRatio, 1)
-
-			d.hpBg.Position = Vector2.new(bx - 1, boxY - 1)
-			d.hpBg.Size = Vector2.new(bw + 2, boxH + 2)
-			d.hpBg.Visible = true
-
-			d.hpOutline.Position = Vector2.new(bx - 1, boxY - 1)
-			d.hpOutline.Size = Vector2.new(bw + 2, boxH + 2)
-			d.hpOutline.Visible = true
-
-			d.hpFill.Position = Vector2.new(bx, boxY + (boxH - fillH))
-			d.hpFill.Size = Vector2.new(bw, fillH)
-			d.hpFill.Color = hpCol
-			d.hpFill.Visible = true
-		else
-			d.hpBg.Visible = false
-			d.hpOutline.Visible = false
-			d.hpFill.Visible = false
-		end
-
-		if CFG.ShowTracer then
-			local vs = camera.ViewportSize
-			d.tracer.From = Vector2.new(vs.X * 0.5, vs.Y)
-			d.tracer.To = Vector2.new(centerX, boxY + boxH)
-			d.tracer.Color = color
-			d.tracer.Visible = true
-		else
-			d.tracer.Visible = false
-		end
+	if CFG.ShowTracer then
+		local vs = camera.ViewportSize
+		draw.tracer.From = Vector2.new(vs.X * 0.5, vs.Y - 2)
+		draw.tracer.To = Vector2.new(box.cx, box.y + box.h)
+		draw.tracer.Color = color
+		draw.tracer.Visible = true
+	else
+		draw.tracer.Visible = false
 	end
 
 	if entry.highlight then
 		entry.highlight.Enabled = CFG.ShowHighlight
-		entry.highlight.FillColor = color
-		entry.highlight.OutlineColor = color
 	end
 
 	return true
 end
 
-local function isPlayerCharacter(model)
-	for _, player in ipairs(Players:GetPlayers()) do
-		if player.Character == model then
-			return true
+local function rebuildPlayerCharacters()
+	table.clear(module._playerCharacters)
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p.Character then
+			module._playerCharacters[p.Character] = true
 		end
 	end
-	return false
 end
 
 local function scanNPCs()
@@ -517,13 +481,17 @@ local function scanNPCs()
 		return
 	end
 
+	rebuildPlayerCharacters()
+
 	for _, obj in ipairs(Workspace:GetChildren()) do
-		if obj:IsA("Model") and obj ~= LocalPlayer.Character and not module._objects[obj] then
-			local humanoid = getHumanoid(obj)
-			if humanoid and humanoid.Health > 0 then
-				if not isPlayerCharacter(obj) and not isNPCAlly(obj) then
-					addEntity(obj, nil)
-				end
+		if obj:IsA("Model")
+			and obj ~= LocalPlayer.Character
+			and not module._playerCharacters[obj]
+			and not module._objects[obj]
+		then
+			local hum = getHumanoid(obj)
+			if hum and hum.Health > 0 and not isAllyNPC(obj) then
+				addEntity(obj, nil)
 			end
 		end
 	end
@@ -542,7 +510,8 @@ local function setupPlayer(player)
 		return
 	end
 
-	local function onCharacter(character)
+	local function onCharacterAdded(character)
+		module._playerCharacters[character] = true
 		removePlayerEntry(player)
 
 		task.defer(function()
@@ -554,12 +523,12 @@ local function setupPlayer(player)
 				return
 			end
 
-			local humanoid = getHumanoid(character) or character:WaitForChild("Humanoid", 5)
-			if not humanoid or humanoid.Health <= 0 then
+			local hum = getHumanoid(character) or character:WaitForChild("Humanoid", 3)
+			if not hum or hum.Health <= 0 then
 				return
 			end
 
-			if isPlayerAlly(player) then
+			if isAlly(player) then
 				return
 			end
 
@@ -567,24 +536,22 @@ local function setupPlayer(player)
 		end)
 	end
 
-	setConnection("char_" .. player.UserId, player.CharacterAdded:Connect(onCharacter))
-
-	setConnection("team_" .. player.UserId, player:GetPropertyChangedSignal("Team"):Connect(function()
+	bind("char_" .. player.UserId, player.CharacterAdded:Connect(onCharacterAdded))
+	bind("team_" .. player.UserId, player:GetPropertyChangedSignal("Team"):Connect(function()
 		if not module.Enabled then
 			return
 		end
 
 		task.defer(function()
 			removePlayerEntry(player)
-
-			if player.Character and not isPlayerAlly(player) then
+			if player.Character and not isAlly(player) then
 				addEntity(player.Character, player)
 			end
 		end)
 	end))
 
 	if player.Character then
-		onCharacter(player.Character)
+		onCharacterAdded(player.Character)
 	end
 end
 
@@ -592,6 +559,7 @@ function module:Init()
 	self._objects = {}
 	self._connections = {}
 	self._npcTimer = 0
+	self._playerCharacters = {}
 end
 
 function module:OnEnable()
@@ -603,28 +571,32 @@ function module:OnEnable()
 	end
 	self._objects = {}
 
+	rebuildPlayerCharacters()
+
 	for _, player in ipairs(Players:GetPlayers()) do
 		setupPlayer(player)
 	end
 
-	setConnection("playerAdded", Players.PlayerAdded:Connect(function(player)
+	bind("playerAdded", Players.PlayerAdded:Connect(function(player)
 		setupPlayer(player)
 	end))
 
-	setConnection("playerRemoving", Players.PlayerRemoving:Connect(function(player)
+	bind("playerRemoving", Players.PlayerRemoving:Connect(function(player)
 		removePlayerEntry(player)
 
-		local charKey = "char_" .. player.UserId
-		local teamKey = "team_" .. player.UserId
+		local cKey = "char_" .. player.UserId
+		local tKey = "team_" .. player.UserId
 
-		disconnect(module._connections[charKey])
-		disconnect(module._connections[teamKey])
+		disconnect(module._connections[cKey])
+		disconnect(module._connections[tKey])
 
-		module._connections[charKey] = nil
-		module._connections[teamKey] = nil
+		module._connections[cKey] = nil
+		module._connections[tKey] = nil
+
+		rebuildPlayerCharacters()
 	end))
 
-	setConnection("descAdded", Workspace.DescendantAdded:Connect(function(desc)
+	bind("descAdded", Workspace.DescendantAdded:Connect(function(desc)
 		if not module.Enabled or not CFG.ShowNPCs then
 			return
 		end
@@ -633,9 +605,13 @@ function module:OnEnable()
 			return
 		end
 
+		local model = desc.Parent
+		if not model or not model:IsA("Model") then
+			return
+		end
+
 		task.defer(function()
-			local model = desc.Parent
-			if not model or not model:IsA("Model") then
+			if not module.Enabled then
 				return
 			end
 
@@ -643,11 +619,11 @@ function module:OnEnable()
 				return
 			end
 
-			if module._objects[model] then
+			if module._playerCharacters[model] then
 				return
 			end
 
-			if isPlayerCharacter(model) then
+			if module._objects[model] then
 				return
 			end
 
@@ -655,7 +631,7 @@ function module:OnEnable()
 				return
 			end
 
-			if isNPCAlly(model) then
+			if isAllyNPC(model) then
 				return
 			end
 
@@ -663,36 +639,28 @@ function module:OnEnable()
 		end)
 	end))
 
-	setConnection("descRemoving", Workspace.DescendantRemoving:Connect(function(desc)
+	bind("descRemoving", Workspace.DescendantRemoving:Connect(function(desc)
 		if desc:IsA("Model") and module._objects[desc] then
 			destroyEntry(desc)
-			return
-		end
-
-		if desc:IsA("Humanoid") and desc.Parent and module._objects[desc.Parent] then
-			local entry = module._objects[desc.Parent]
-			if entry.isNPC then
-				destroyEntry(desc.Parent)
-			end
 		end
 	end))
 
-	setConnection("myTeamChanged", LocalPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+	bind("myTeamChanged", LocalPlayer:GetPropertyChangedSignal("Team"):Connect(function()
 		if not module.Enabled then
 			return
 		end
 
 		task.defer(function()
 			for model, entry in pairs(module._objects) do
-				if entry.player and isPlayerAlly(entry.player) then
+				if entry.player and isAlly(entry.player) then
 					destroyEntry(model)
-				elseif entry.isNPC and isNPCAlly(model) then
+				elseif entry.isNPC and isAllyNPC(model) then
 					destroyEntry(model)
 				end
 			end
 
 			for _, player in ipairs(Players:GetPlayers()) do
-				if player ~= LocalPlayer and player.Character and not isPlayerAlly(player) then
+				if player ~= LocalPlayer and player.Character and not isAlly(player) then
 					if not module._objects[player.Character] then
 						addEntity(player.Character, player)
 					end
@@ -705,22 +673,27 @@ function module:OnEnable()
 
 	task.defer(scanNPCs)
 
-	setConnection("render", RunService.RenderStepped:Connect(function(dt)
+	bind("render", RunService.RenderStepped:Connect(function(dt)
 		if not module.Enabled then
 			return
 		end
 
-		local removeList = {}
+		local camera = Workspace.CurrentCamera
+		if not camera then
+			return
+		end
+
+		local localRoot = getLocalRoot()
+		local toRemove = {}
 
 		for model, entry in pairs(module._objects) do
-			local ok = updateEntry(entry)
-			if not ok then
-				table.insert(removeList, model)
+			if not updateEntry(entry, camera, localRoot) then
+				toRemove[#toRemove + 1] = model
 			end
 		end
 
-		for _, model in ipairs(removeList) do
-			destroyEntry(model)
+		for i = 1, #toRemove do
+			destroyEntry(toRemove[i])
 		end
 
 		module._npcTimer += dt
@@ -743,6 +716,8 @@ function module:OnDisable()
 		disconnect(conn)
 		self._connections[key] = nil
 	end
+
+	table.clear(self._playerCharacters)
 end
 
 function module:OnTick()
