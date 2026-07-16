@@ -2,96 +2,98 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local Camera = Workspace.CurrentCamera
 
-local module = {
-    Name     = "AimBot (Alt)",
-    Category = "Combat",
-    Enabled  = false,
+local AimBot = {
+    __settings__ = {},
+    SettingsDefinitions = {
+        { Name = "Плавность",      Key = "Smoothness", Type = "Slider",   Min = 1,  Max = 20, Step = 1,  Default = 5,  Suffix = "" },
+        { Name = "FOV",            Key = "FOV",        Type = "Slider",   Min = 10, Max = 500, Step = 10, Default = 200, Suffix = "" },
+        { Name = "Зона",           Key = "TargetPart", Type = "Dropdown", Options = {"Head", "HumanoidRootPart", "UpperTorso"}, Default = "Head" },
+        { Name = "Только видимые", Key = "VisCheck",   Type = "Toggle",   Default = true },
+        { Name = "Показать FOV",   Key = "ShowFOV",    Type = "Toggle",   Default = false },
+    },
 }
 
-local CONFIG = {
-    FOV            = 180,
-    AimSmoothSpeed = 12,
-    HoldKey        = Enum.KeyCode.LeftAlt,
-    IgnoreTeammates = true,
-}
+local connection = nil
 
-local aimHolding = false
-
-
-local function isEnemy(plr)
-    if plr == LocalPlayer then return false end
-    if not CONFIG.IgnoreTeammates then return true end
-    if not LocalPlayer.Team or not plr.Team then return true end
-    return plr.Team ~= LocalPlayer.Team
+function AimBot:Init()
+    self.__settings__.Smoothness = self.__settings__.Smoothness or 5
+    self.__settings__.FOV = self.__settings__.FOV or 200
+    self.__settings__.TargetPart = self.__settings__.TargetPart or "Head"
+    self.__settings__.VisCheck = self.__settings__.VisCheck == nil and true or self.__settings__.VisCheck
+    self.__settings__.ShowFOV = self.__settings__.ShowFOV or false
 end
 
-local function getHead(char)
-    return char and char:FindFirstChild("Head")
-end
+local function getClosestPlayer()
+    local closest = nil
+    local minDist = math.huge
+    local smoothness = AimBot.__settings__.Smoothness or 5
+    local fov = AimBot.__settings__.FOV or 200
+    local targetPart = AimBot.__settings__.TargetPart or "Head"
+    local visCheck = AimBot.__settings__.VisCheck
 
-local function getBestTarget()
-    local vp = Camera.ViewportSize
-    local center = Vector2.new(vp.X/2, vp.Y/2)
-    local bestHead, bestDist
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if isEnemy(plr) and plr.Character then
-            local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-            if hum and hum.Health > 0 then
-                local head = getHead(plr.Character)
-                if head then
-                    local sp = Camera:WorldToViewportPoint(head.Position)
-                    if sp.Z > 0 then
-                        local dist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
-                        if dist <= CONFIG.FOV and (not bestDist or dist < bestDist) then
-                            bestHead, bestDist = head, dist
-                        end
+    local localChar = LocalPlayer.Character
+    if not localChar then return nil end
+    local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+    if not localRoot then return nil end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local char = player.Character
+            local humanoid = char:FindFirstChild("Humanoid")
+            local root = char:FindFirstChild("HumanoidRootPart")
+            local part = char:FindFirstChild(targetPart) or root
+
+            if humanoid and humanoid.Health > 0 and root then
+                if visCheck then
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterDescendantsInstances = {localChar, char}
+                    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+                    local origin = Camera.CFrame.Position
+                    local direction = (part.Position - origin)
+                    local result = Workspace:Raycast(origin, direction, rayParams)
+                    if result then continue end
+                end
+
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local mousePos = UserInputService:GetMouseLocation()
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if dist < fov and dist < minDist then
+                        minDist = dist
+                        closest = part
                     end
                 end
             end
         end
     end
-    return bestHead
+
+    return closest
 end
 
-local function aimAt(head, dt)
-    if not head then return end
-    local desired = CFrame.new(Camera.CFrame.Position, head.Position)
-    local t = 1 - math.exp(-CONFIG.AimSmoothSpeed * dt)
-    Camera.CFrame = Camera.CFrame:Lerp(desired, math.clamp(t,0,1))
-end
-
-
-function module:OnEnable()
-    self.Enabled = true
-
-    UserInputService.InputBegan:Connect(function(input,gp)
-        if gp then return end
-        if input.KeyCode == CONFIG.HoldKey then aimHolding = true end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.KeyCode == CONFIG.HoldKey then aimHolding = false end
+function AimBot:OnEnable()
+    print("[Xclient] AimBot ON")
+    connection = RunService.RenderStepped:Connect(function()
+        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+            local target = getClosestPlayer()
+            if target then
+                local smoothness = self.__settings__.Smoothness or 5
+                local currentCF = Camera.CFrame
+                local targetCF = CFrame.new(currentCF.Position, target.Position)
+                Camera.CFrame = currentCF:Lerp(targetCF, 1 / math.max(smoothness, 1))
+            end
+        end
     end)
 end
 
-function module:OnDisable()
-    self.Enabled = false
-    aimHolding = false
+function AimBot:OnDisable()
+    print("[Xclient] AimBot OFF")
+    if connection then connection:Disconnect() connection = nil end
 end
 
-function module:Init()
-
-end
-
-function module:OnTick(dt)
-    if not self.Enabled then return end
-    if aimHolding then
-        local head = getBestTarget()
-        aimAt(head, dt)
-    end
-end
-
-return module
+return AimBot

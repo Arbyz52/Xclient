@@ -1,9 +1,39 @@
 {
   "modules": [
     {
-      "path": "modules/Misc/SkinChanger.lua",
-      "category": "Misc",
-      "name": "SkinChanger"
+      "path": "modules/Combat/AimBot.lua",
+      "category": "Combat",
+      "name": "AimBot"
+    },
+    {
+      "path": "modules/Combat/SilentAim.lua",
+      "category": "Combat",
+      "name": "SilentAim"
+    },
+    {
+      "path": "modules/Combat/TriggerBot.lua",
+      "category": "Combat",
+      "name": "TriggerBot"
+    },
+    {
+      "path": "modules/Movement/BunnyHop.lua",
+      "category": "Movement",
+      "name": "BunnyHop Legit"
+    },
+    {
+      "path": "modules/Movement/BunnyHopV2.lua",
+      "category": "Movement",
+      "name": "BunnyHop RAGE"
+    },
+    {
+      "path": "modules/Movement/Fly.lua",
+      "category": "Movement",
+      "name": "Fly"
+    },
+    {
+      "path": "modules/Movement/SpeedHack.lua",
+      "category": "Movement",
+      "name": "SpeedHack"
     },
     {
       "path": "modules/Visuals/ESP.lua",
@@ -14,6 +44,26 @@
       "path": "modules/Visuals/NameTags.lua",
       "category": "Visuals",
       "name": "NameTags"
+    },
+    {
+      "path": "modules/Visuals/Chams.lua",
+      "category": "Visuals",
+      "name": "Chams"
+    },
+    {
+      "path": "modules/Visuals/Tracers.lua",
+      "category": "Visuals",
+      "name": "Tracers"
+    },
+    {
+      "path": "modules/Visuals/FullBright.lua",
+      "category": "Visuals",
+      "name": "FullBright"
+    },
+    {
+      "path": "modules/Visuals/NoFog.lua",
+      "category": "Visuals",
+      "name": "NoFog"
     },
     {
       "path": "modules/Player/GunSound.lua",
@@ -31,19 +81,19 @@
       "name": "HitSound"
     },
     {
-      "path": "modules/Movement/BunnyHopV2.lua",
-      "category": "Movement",
-      "name": "BunnyHop RAGE"
+      "path": "modules/Misc/SkinChanger.lua",
+      "category": "Misc",
+      "name": "SkinChanger"
     },
     {
-      "path": "modules/Combat/AimBot.lua",
-      "category": "Combat",
-      "name": "AimBot (Alt)"
+      "path": "modules/Misc/AntiAFK.lua",
+      "category": "Misc",
+      "name": "AntiAFK"
     },
     {
-      "path": "modules/Movement/BunnyHop.lua",
-      "category": "Movement",
-      "name": "BunnyHop Legit"
+      "path": "modules/Misc/FPSBooster.lua",
+      "category": "Misc",
+      "name": "FPSBooster"
     }
   ]
 }

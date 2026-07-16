@@ -1,124 +1,66 @@
-local module = {
-    Name     = "GunSound",
-    Category = "Visuals",
-    Enabled  = false,
-    _connections = {}
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local GunSound = {
+    __settings__ = {},
+    SettingsDefinitions = {
+        { Name = "Громкость", Key = "Volume", Type = "Slider", Min = 0.1, Max = 3, Step = 0.1, Default = 1.5, Suffix = "x" },
+        { Name = "ID звука",  Key = "SoundId", Type = "Dropdown", Options = {
+            "rbxassetid://138081500",
+            "rbxassetid://138081500",
+            "rbxassetid://2927688157",
+            "rbxassetid://148880905",
+        }, Default = "rbxassetid://138081500" },
+    },
 }
 
-local Workspace = game:GetService("Workspace")
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local connection = nil
 
-local LP = Players.LocalPlayer
+function GunSound:Init()
+    self.__settings__.Volume = self.__settings__.Volume or 1.5
+    self.__settings__.SoundId = self.__settings__.SoundId or "rbxassetid://138081500"
+end
 
-local MY_SOUND = "rbxassetid://5852470908"
-local VOL = 5 
+function GunSound:OnEnable()
+    print("[Xclient] GunSound ON")
 
+    local function hookCharacter(char)
+        local humanoid = char:WaitForChild("Humanoid", 10)
+        if not humanoid then return end
 
-local function IsEnemySound(sound)
-
-    if sound:IsDescendantOf(Workspace.CurrentCamera) then
-        return false 
-    end
-
-
-    if LP.Character and sound:IsDescendantOf(LP.Character) then
-        return false 
-    end
-
-
-    local parent = sound.Parent
-    while parent do
-        if parent == game or parent == Workspace then break end
-
-        if parent:IsA("Model") and parent:FindFirstChild("Humanoid") then
-            if parent.Name ~= LP.Name then
-                return true 
+        -- Find tools in character
+        for _, tool in ipairs(char:GetChildren()) do
+            if tool:IsA("Tool") then
+                for _, child in ipairs(tool:GetDescendants()) do
+                    if child:IsA("Sound") then
+                        child.SoundId = self.__settings__.SoundId or "rbxassetid://138081500"
+                        child.Volume = self.__settings__.Volume or 1.5
+                    end
+                end
             end
         end
-        parent = parent.Parent
-    end
 
-    return false 
-end
-
-local function ForceSound(sound)
-
-    if not module.Enabled then return end
-    
-
-    if sound.SoundId == MY_SOUND then return end
-
-
-    if IsEnemySound(sound) then return end
-
-
-    sound.SoundId = MY_SOUND
-    sound.Volume = VOL
-    
-
-end
-
-local function Check(obj)
-
-    if not module.Enabled then return end
-
-    if obj:IsA("Sound") then
-        local name = obj.Name:lower()
-        
-
-        if name:find("fire") or name:find("shoot") or name:find("shot") or name:find("blast") or name:find("bang") or name:find("release") then
-            
-  
-            if name:find("hit") or name:find("head") or name:find("marker") then return end
-
-
-            ForceSound(obj)
-            
-
-            local conn = obj:GetPropertyChangedSignal("SoundId"):Connect(function()
-                if module.Enabled and obj.SoundId ~= MY_SOUND then
-                    ForceSound(obj)
+        char.ChildAdded:Connect(function(child)
+            if child:IsA("Tool") then
+                task.wait(0.1)
+                for _, desc in ipairs(child:GetDescendants()) do
+                    if desc:IsA("Sound") then
+                        desc.SoundId = self.__settings__.SoundId or "rbxassetid://138081500"
+                        desc.Volume = self.__settings__.Volume or 1.5
+                    end
                 end
-            end)
-
-        end
-    end
-end
-
-
-function module:Init()
-    self._connections = {}
-end
-
-function module:OnEnable()
-    self.Enabled = true
-
-
-    for _, v in ipairs(Workspace:GetDescendants()) do
-        Check(v)
+            end
+        end)
     end
 
-
-    local conn = game.DescendantAdded:Connect(function(obj)
-        Check(obj)
-    end)
-    
-
-    table.insert(module._connections, conn)
+    if LocalPlayer.Character then hookCharacter(LocalPlayer.Character) end
+    connection = LocalPlayer.CharacterAdded:Connect(hookCharacter)
 end
 
-function module:OnDisable()
-    self.Enabled = false
-
-    
-
-    for _, conn in pairs(module._connections) do
-        conn:Disconnect()
-    end
-    module._connections = {}
+function GunSound:OnDisable()
+    print("[Xclient] GunSound OFF")
+    if connection then connection:Disconnect() connection = nil end
 end
 
-function module:OnTick(dt) end
-
-return module
+return GunSound

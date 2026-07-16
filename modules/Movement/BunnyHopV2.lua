@@ -1,98 +1,57 @@
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
-local module = {
-    Name = "BunnyHop RAGE",
-    Category = "Movement",
-    Enabled = false,
+local BunnyHopV2 = {
+    __settings__ = {},
+    SettingsDefinitions = {
+        { Name = "Усиление прыжка", Key = "BoostPower", Type = "Slider", Min = 10, Max = 100, Step = 5, Default = 40, Suffix = "" },
+        { Name = "Задержка (мс)",   Key = "Delay",      Type = "Slider", Min = 0,  Max = 50,  Step = 5, Default = 0,  Suffix = "мс" },
+    },
 }
 
-local CONFIG = {
-    HoldKey   = Enum.KeyCode.Space,
-    BoostForce = 24,
-    MinY       = 1.5,
-}
+local connection = nil
 
-
-local steppedConn
-local charAddedConn
-
-
-local function getChar()
-    local char = LocalPlayer.Character
-    if not char then return nil, nil end
-    local hum = char:FindFirstChild("Humanoid")
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hum or not hrp then return nil, nil end
-    return hum, hrp
+function BunnyHopV2:Init()
+    self.__settings__.BoostPower = self.__settings__.BoostPower or 40
+    self.__settings__.Delay = self.__settings__.Delay or 0
 end
 
+function BunnyHopV2:OnEnable()
+    print("[Xclient] BunnyHop RAGE ON")
 
-local function tickFrame(self)
+    connection = RunService.Heartbeat:Connect(function()
+        local char = LocalPlayer.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local humanoid = char:FindFirstChild("Humanoid")
+        if not root or not humanoid then return end
 
-    if not self.Enabled then return end
+        local boost = self.__settings__.BoostPower or 40
+        local delay = self.__settings__.Delay or 0
 
-
-    if not UserInputService:IsKeyDown(CONFIG.HoldKey) then return end
-
-    local hum, hrp = getChar()
-    if not hum or not hrp then return end
-
-    if hum.FloorMaterial ~= Enum.Material.Air then
-        hum.Jump = true
-    end
-
-    local v = hrp.AssemblyLinearVelocity
-    local isJumping = math.abs(v.Y) > CONFIG.MinY or hum.FloorMaterial == Enum.Material.Air
-
-    if isJumping then
-        local dir = hum.MoveDirection
-        if dir.Magnitude > 0 then
-            local push = dir.Unit * CONFIG.BoostForce
-            hrp.AssemblyLinearVelocity = Vector3.new(push.X, v.Y, push.Z)
+        if humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                local vel = root.AssemblyLinearVelocity
+                root.AssemblyLinearVelocity = Vector3.new(vel.X, boost, vel.Z)
+            end
         end
-    end
-end
 
-local function attach(self)
-    if steppedConn then steppedConn:Disconnect() steppedConn = nil end
-    if charAddedConn then charAddedConn:Disconnect() charAddedConn = nil end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            humanoid.Jump = true
+        end
 
-    steppedConn = RunService.RenderStepped:Connect(function()
-        tickFrame(self)
-    end)
-    
-    charAddedConn = LocalPlayer.CharacterAdded:Connect(function()
+        if delay > 0 then
+            task.wait(delay / 1000)
+        end
     end)
 end
 
-function module:OnEnable()
-    self.Enabled = true
-    attach(self)
+function BunnyHopV2:OnDisable()
+    print("[Xclient] BunnyHop RAGE OFF")
+    if connection then connection:Disconnect() connection = nil end
 end
 
-function module:OnDisable()
-    self.Enabled = false
-
-    if steppedConn then
-        steppedConn:Disconnect()
-        steppedConn = nil
-    end
-    if charAddedConn then
-        charAddedConn:Disconnect()
-        charAddedConn = nil
-    end
-end
-
-function module:Init()
-
-end
-
-function module:OnTick(dt)
-
-end
-
-return module
+return BunnyHopV2
