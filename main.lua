@@ -2,6 +2,7 @@
 local GITHUB_USER   = "Arbyz52"
 local GITHUB_REPO   = "Xclient"
 local GITHUB_BRANCH = "main"
+local VERSION        = "2.0.0"
 
 local RAW_BASE = string.format(
     "https://raw.githubusercontent.com/%s/%s/%s/",
@@ -11,64 +12,93 @@ local RAW_BASE = string.format(
 local MANIFEST_URL   = RAW_BASE .. "manifest.json"
 local GUI_URL        = RAW_BASE .. "gui.lua"
 local AUTOCONFIG_URL = RAW_BASE .. "autoconfig.lua"
+local NOTIF_URL      = RAW_BASE .. "lib/Notifications.lua"
 
 local HttpService = game:GetService("HttpService")
 local RunService  = game:GetService("RunService")
 local Players     = game:GetService("Players")
 
+local CACHE_DIR    = "XclientCache/"
+local MAX_RETRIES  = 2
+local RETRY_DELAY  = 0.5
 
-local function httpGet(url)
+local function ensureCacheDir()
+    pcall(function()
+        if not isfolder(CACHE_DIR) then
+            makefolder(CACHE_DIR)
+        end
+    end)
+end
+
+local function httpGet(url, retries)
+    retries = retries or MAX_RETRIES
+
+    local function tryRequest(reqFunc)
+        for attempt = 1, retries do
+            local ok, res = pcall(reqFunc)
+            if ok and res then
+                local body = type(res) == "string" and res or (res.Body or res.body)
+                if type(body) == "string" and #body > 0 then
+                    return body
+                end
+            end
+            if attempt < retries then
+                task.wait(RETRY_DELAY)
+            end
+        end
+        return nil
+    end
+
+    local result = nil
 
     if game and game.HttpGet then
-        local ok, res = pcall(function()
-            return game:HttpGet(url)
+        result = tryRequest(function() return game:HttpGet(url) end)
+    end
+
+    if not result and syn and syn.request then
+        result = tryRequest(function()
+            local r = syn.request({ Url = url, Method = "GET" })
+            return r
         end)
-        if ok and type(res) == "string" then
-            return res
+    end
+
+    if not result and http_request then
+        result = tryRequest(function()
+            local r = http_request({ Url = url, Method = "GET" })
+            return r
+        end)
+    end
+
+    if not result and request then
+        result = tryRequest(function()
+            local r = request({ Url = url, Method = "GET" })
+            return r
+        end)
+    end
+
+    if not result then
+        result = tryRequest(function()
+            return HttpService:GetAsync(url)
+        end)
+    end
+
+    if result then
+        ensureCacheDir()
+        local cacheKey = url:gsub("[^%w]", "_")
+        pcall(function() writefile(CACHE_DIR .. cacheKey, result) end)
+        return result
+    end
+
+    local cacheKey = url:gsub("[^%w]", "_")
+    if isfile(CACHE_DIR .. cacheKey) then
+        local ok, cached = pcall(readfile, CACHE_DIR .. cacheKey)
+        if ok and cached and #cached > 0 then
+            warn("[Xclient] Использую кеш для:", url)
+            return cached
         end
     end
 
-
-    if syn and syn.request then
-        local ok, res = pcall(syn.request, {
-            Url = url,
-            Method = "GET",
-        })
-        if ok and res and (res.Body or res.body) then
-            return res.Body or res.body
-        end
-    end
-
-
-    if http_request then
-        local ok, res = pcall(http_request, {
-            Url = url,
-            Method = "GET",
-        })
-        if ok and res and (res.Body or res.body) then
-            return res.Body or res.body
-        end
-    end
-
-    if request then
-        local ok, res = pcall(request, {
-            Url = url,
-            Method = "GET",
-        })
-        if ok and res and (res.Body or res.body) then
-            return res.Body or res.body
-        end
-    end
-
-
-    local ok, res = pcall(function()
-        return HttpService:GetAsync(url)
-    end)
-    if ok and type(res) == "string" then
-        return res
-    end
-
-    error("[Xclient] HTTP GET провалился для URL: " .. tostring(url))
+    error("[Xclient] HTTP GET failed for: " .. tostring(url))
 end
 
 local function getJSON(url)
@@ -80,6 +110,8 @@ end
 local ModuleManager = {
     Modules    = {},
     Categories = {},
+    Keybinds   = {},
+    Version    = VERSION,
 }
 
 function ModuleManager:RegisterModule(mod)
@@ -121,6 +153,12 @@ function ModuleManager:Tick(dt)
     end
 end
 
+function ModuleManager:GetModuleByName(name)
+    for _, mod in ipairs(self.Modules) do
+        if mod.Name == name then return mod end
+    end
+    return nil
+end
 
 function ModuleManager:ReloadFromManifest()
     print("[Xclient] Загружаю manifest.json...")
@@ -165,7 +203,6 @@ function ModuleManager:ReloadFromManifest()
                 warn("[Xclient] Не удалось скачать", path, ":", code)
             else
                 if mtype == "raw" then
-
                     local chunk, lerr = loadstring(code, "@" .. path)
                     if not chunk then
                         warn("[Xclient] loadstring error (raw)", path, ":", lerr)
@@ -186,7 +223,7 @@ function ModuleManager:ReloadFromManifest()
                         end
 
                         function wrapper:OnDisable()
-                            print("[Xclient][RAW]", self.Name, "OFF (ничего не делаем)")
+                            print("[Xclient][RAW]", self.Name, "OFF")
                         end
 
                         self:RegisterModule(wrapper)
@@ -194,7 +231,6 @@ function ModuleManager:ReloadFromManifest()
                         print("[Xclient] RAW-скрипт загружен:", category .. "/" .. name)
                     end
                 else
-
                     local chunk, lerr = loadstring(code, "@" .. path)
                     if not chunk then
                         warn("[Xclient] loadstring error (module)", path, ":", lerr)
@@ -222,18 +258,40 @@ function ModuleManager:ReloadFromManifest()
 end
 
 
+local Notifications
+
+local function loadLibraries()
+    local ok1, lib1 = pcall(httpGet, NOTIF_URL)
+    if ok1 and lib1 then
+        local chunk, err = loadstring(lib1, "@Notifications.lua")
+        if chunk then
+            local ok2, result = pcall(chunk)
+            if ok2 and type(result) == "table" then
+                Notifications = result
+                Notifications:Init()
+            end
+        end
+    end
+end
+
+loadLibraries()
+
 ModuleManager:ReloadFromManifest()
 
+local function notify(text, duration, color)
+    if Notifications then
+        Notifications:Show(text, duration, color)
+    end
+    print("[Xclient]", text)
+end
 
 local function initAutoConfig()
-
     local ModulesMap = {}
     for _, mod in ipairs(ModuleManager.Modules) do
         if mod.Name then
             ModulesMap[mod.Name] = mod
         end
     end
-
 
     local codeOK, code = pcall(httpGet, AUTOCONFIG_URL)
     if not codeOK then
@@ -253,18 +311,17 @@ local function initAutoConfig()
         return
     end
 
-    AutoConfigLib.Load(ModulesMap)
+    AutoConfigLib.Load(ModulesMap, ModuleManager.Keybinds)
 
     task.spawn(function()
         while true do
             task.wait(5)
-            AutoConfigLib.Save(ModulesMap)
+            AutoConfigLib.Save(ModulesMap, ModuleManager.Keybinds)
         end
     end)
 
-
     Players.PlayerRemoving:Connect(function()
-        AutoConfigLib.Save(ModulesMap)
+        AutoConfigLib.Save(ModulesMap, ModuleManager.Keybinds)
     end)
 end
 
@@ -286,7 +343,7 @@ local function initGUI()
     end
 
     if type(GuiModule) == "table" and type(GuiModule.Init) == "function" then
-        GuiModule.Init(ModuleManager)
+        GuiModule.Init(ModuleManager, Notifications)
     else
         warn("[Xclient] gui.lua должен return'ить таблицу с Init(ModuleManager)")
     end
@@ -294,6 +351,7 @@ end
 
 initGUI()
 
+notify("Xclient v" .. VERSION .. " загружен!", 4, Color3.fromRGB(45, 100, 65))
 
 RunService.RenderStepped:Connect(function(dt)
     ModuleManager:Tick(dt)
