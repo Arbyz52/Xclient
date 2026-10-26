@@ -35,7 +35,6 @@ function Gui.Init(ModuleManager, Notifications)
         Close       = "rbxassetid://10747384394", -- Close Window
         ChevronDown = "rbxassetid://10709790948", -- Dropdown Arrow
         Zap         = "rbxassetid://10723376114", -- Logo Zap
-        GlowShadow  = "rbxassetid://5028857472",  -- 9-slice True Glow Texture
     }
 
     -- ========== RICH UI SOUND EFFECTS ==========
@@ -62,8 +61,6 @@ function Gui.Init(ModuleManager, Notifications)
     end
 
     -- ========== БЕЗУПРЕЧНЫЙ ПЛОТНЫЙ ШРИФТ БЕЗ РАЗРЫВОВ КИРИЛЛИЦЫ ==========
-    -- Используем BuilderSansBold (новый шрифт Roblox 2024 с идеальной кириллицей)
-    -- с надёжным фоллбеком на SourceSansBold, в котором нет бага с буквой 'л'
     local MainFont = Enum.Font.SourceSansBold
     pcall(function()
         if Enum.Font.BuilderSansBold then
@@ -71,13 +68,10 @@ function Gui.Init(ModuleManager, Notifications)
         end
     end)
 
-    -- ========== MENU CONFIG & RICH THEME ==========
+    -- ========== MENU CONFIG & CLEAN MODERN THEME ==========
     local MenuConfig = {
-        LiquidGlass    = true,
-        MenuGlow       = true,
-        WindowOpacity  = 0.92,
+        WindowOpacity  = 0.96,
         AnimationSpeed = 1.0,
-        MenuScale      = 1.0,
         AccentColor    = Color3.fromRGB(120, 100, 255), -- Фирменный Rich Purple
     }
 
@@ -92,13 +86,13 @@ function Gui.Init(ModuleManager, Notifications)
     }
 
     local Theme = {
-        WindowBg      = Color3.fromRGB(14, 16, 25),
-        PanelBg       = Color3.fromRGB(19, 22, 34),
-        PanelHeader   = Color3.fromRGB(25, 29, 45),
-        CardBg        = Color3.fromRGB(24, 28, 43),
-        CardHover     = Color3.fromRGB(32, 38, 58),
-        CardSelected  = Color3.fromRGB(36, 42, 65),
-        StrokeDim     = Color3.fromRGB(40, 45, 66),
+        WindowBg      = Color3.fromRGB(15, 17, 26),
+        PanelBg       = Color3.fromRGB(20, 23, 35),
+        PanelHeader   = Color3.fromRGB(26, 30, 46),
+        CardBg        = Color3.fromRGB(25, 29, 44),
+        CardHover     = Color3.fromRGB(33, 39, 59),
+        CardSelected  = Color3.fromRGB(37, 43, 66),
+        StrokeDim     = Color3.fromRGB(42, 48, 70),
         TextPrimary   = Color3.fromRGB(255, 255, 255),
         TextSecondary = Color3.fromRGB(180, 190, 215),
         TextMuted     = Color3.fromRGB(115, 125, 148),
@@ -125,8 +119,12 @@ function Gui.Init(ModuleManager, Notifications)
     local keybindCallback      = nil
     local searchQuery          = ""
 
-    local BASE_WIDTH           = 850
-    local BASE_HEIGHT          = 520
+    local currentWidth         = 850
+    local currentHeight        = 520
+    local MIN_WIDTH            = 680
+    local MIN_HEIGHT           = 400
+    local MAX_WIDTH            = 1300
+    local MAX_HEIGHT           = 850
 
     local moduleCardItems      = {}
     local categoryButtons      = {}
@@ -141,80 +139,25 @@ function Gui.Init(ModuleManager, Notifications)
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     screenGui.Parent = parent
 
-    -- ========== TRUE NEON GLOW BLOOM (9-SLICE PNG) ==========
-    local glowShadow = Instance.new("ImageLabel")
-    glowShadow.Name = "NeonGlowBloom"
-    glowShadow.AnchorPoint = Vector2.new(0.5, 0.5)
-    glowShadow.Size = UDim2.new(0, BASE_WIDTH + 60, 0, BASE_HEIGHT + 60)
-    glowShadow.Position = UDim2.new(0.5, 0, 0.5, 0)
-    glowShadow.BackgroundTransparency = 1
-    glowShadow.Image = Icons.GlowShadow
-    glowShadow.ImageColor3 = MenuConfig.AccentColor
-    glowShadow.ImageTransparency = MenuConfig.MenuGlow and 0.55 or 1
-    glowShadow.ScaleType = Enum.ScaleType.Slice
-    glowShadow.SliceCenter = Rect.new(24, 24, 276, 276)
-    glowShadow.ZIndex = 1
-    glowShadow.Parent = screenGui
-
-    local glowScale = Instance.new("UIScale", glowShadow)
-    glowScale.Name = "GlowScale"
-    glowScale.Scale = MenuConfig.MenuScale
-
-    -- ========== MAIN WINDOW (RICH-MODERN SHELL) ==========
+    -- ========== MAIN WINDOW (SOLID CLEAN RICH-MODERN SHELL) ==========
     local mainWindow = Instance.new("Frame")
     mainWindow.Name = "RichModernWindow"
-    mainWindow.AnchorPoint = Vector2.new(0.5, 0.5)
-    mainWindow.Size = UDim2.new(0, BASE_WIDTH, 0, BASE_HEIGHT)
-    mainWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
+    mainWindow.Size = UDim2.new(0, currentWidth, 0, currentHeight)
+    mainWindow.Position = UDim2.new(0.5, -currentWidth / 2, 0.5, -currentHeight / 2)
     mainWindow.BackgroundColor3 = Theme.WindowBg
     mainWindow.BackgroundTransparency = 1 - MenuConfig.WindowOpacity
     mainWindow.BorderSizePixel = 0
     mainWindow.ClipsDescendants = false
     mainWindow.ZIndex = 2
     mainWindow.Parent = screenGui
-    Instance.new("UICorner", mainWindow).CornerRadius = UDim.new(0, 16)
+    Instance.new("UICorner", mainWindow).CornerRadius = UDim.new(0, 14)
 
-    -- ДИНАМИЧЕСКИЙ МАСШТАБ ВСЕХ ЭЛЕМЕНТОВ (ШРИФТЫ, ИКОНКИ, КАРТОЧКИ, ОТСТУПЫ)
-    local menuScale = Instance.new("UIScale", mainWindow)
-    menuScale.Name = "MenuScale"
-    menuScale.Scale = MenuConfig.MenuScale
-
-    -- Liquid Glass Specular Gradient Stroke
+    -- Чёткая строгая граница окна без стекла
     local mainStroke = Instance.new("UIStroke", mainWindow)
-    mainStroke.Color = Color3.fromRGB(255, 255, 255)
-    mainStroke.Thickness = 1.4
-    mainStroke.Transparency = 0.82
-
-    local strokeGradient = Instance.new("UIGradient", mainStroke)
-    strokeGradient.Rotation = 45
-    strokeGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0.0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.3, MenuConfig.AccentColor),
-        ColorSequenceKeypoint.new(0.7, Color3.fromRGB(60, 65, 90)),
-        ColorSequenceKeypoint.new(1.0, Color3.fromRGB(255, 255, 255)),
-    })
-    strokeGradient.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0.0, 0.25),
-        NumberSequenceKeypoint.new(0.4, 0.65),
-        NumberSequenceKeypoint.new(1.0, 0.92),
-    })
-
-    -- Specular Glass Highlight Line (Top Sheen)
-    local topSheen = Instance.new("Frame")
-    topSheen.Name = "TopGlassSheen"
-    topSheen.Size = UDim2.new(1, -32, 0, 1.5)
-    topSheen.Position = UDim2.new(0, 16, 0, 1)
-    topSheen.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    topSheen.BorderSizePixel = 0
-    topSheen.ZIndex = 3
-    topSheen.Parent = mainWindow
-
-    local sheenGrad = Instance.new("UIGradient", topSheen)
-    sheenGrad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0.0, 1.0),
-        NumberSequenceKeypoint.new(0.5, 0.4),
-        NumberSequenceKeypoint.new(1.0, 1.0),
-    })
+    mainStroke.Color = Theme.StrokeDim
+    mainStroke.Thickness = 1.2
+    mainStroke.Transparency = 0
+    mainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
     -- ========== HELPERS ==========
     local function notify(text, dur, color)
@@ -238,25 +181,11 @@ function Gui.Init(ModuleManager, Notifications)
 
     local function applyAccentColor(newColor)
         MenuConfig.AccentColor = newColor
-        glowShadow.ImageColor3 = newColor
         for _, obj in ipairs(accentColorObjects) do
             if obj.inst and obj.inst.Parent then
                 obj.inst[obj.prop] = newColor
             end
         end
-        strokeGradient.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0.0, Color3.fromRGB(255, 255, 255)),
-            ColorSequenceKeypoint.new(0.3, newColor),
-            ColorSequenceKeypoint.new(0.7, Color3.fromRGB(60, 65, 90)),
-            ColorSequenceKeypoint.new(1.0, Color3.fromRGB(255, 255, 255)),
-        })
-    end
-
-    local function setGuiScale(newScale)
-        newScale = math.clamp(newScale, 0.70, 1.45)
-        MenuConfig.MenuScale = newScale
-        menuScale.Scale = newScale
-        glowScale.Scale = newScale
     end
 
     -- ========== LEFT SIDEBAR ==========
@@ -268,7 +197,7 @@ function Gui.Init(ModuleManager, Notifications)
     sidebar.Size = UDim2.new(0, SIDEBAR_WIDTH, 1, -PADDING * 2)
     sidebar.Position = UDim2.new(0, PADDING, 0, PADDING)
     sidebar.BackgroundColor3 = Theme.PanelBg
-    sidebar.BackgroundTransparency = 0.25
+    sidebar.BackgroundTransparency = 0.2
     sidebar.BorderSizePixel = 0
     sidebar.ZIndex = 2
     sidebar.Parent = mainWindow
@@ -277,6 +206,7 @@ function Gui.Init(ModuleManager, Notifications)
     local sidebarStroke = Instance.new("UIStroke", sidebar)
     sidebarStroke.Color = Theme.StrokeDim
     sidebarStroke.Thickness = 1
+    sidebarStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
     -- Brand Card (Top of Sidebar)
     local brandCard = Instance.new("Frame")
@@ -292,6 +222,7 @@ function Gui.Init(ModuleManager, Notifications)
     local brandStroke = Instance.new("UIStroke", brandCard)
     brandStroke.Color = Theme.StrokeDim
     brandStroke.Thickness = 1
+    brandStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
     local logoImg = Instance.new("ImageLabel")
     logoImg.Name = "LogoIcon"
@@ -367,6 +298,7 @@ function Gui.Init(ModuleManager, Notifications)
     local profileStroke = Instance.new("UIStroke", profileCard)
     profileStroke.Color = Theme.StrokeDim
     profileStroke.Thickness = 1
+    profileStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
     local avatarImg = Instance.new("ImageLabel")
     avatarImg.Name = "Avatar"
@@ -424,7 +356,7 @@ function Gui.Init(ModuleManager, Notifications)
     headerCard.Size = UDim2.new(1, 0, 0, HEADER_HEIGHT)
     headerCard.Position = UDim2.new(0, 0, 0, 0)
     headerCard.BackgroundColor3 = Theme.PanelBg
-    headerCard.BackgroundTransparency = 0.25
+    headerCard.BackgroundTransparency = 0.2
     headerCard.BorderSizePixel = 0
     headerCard.ZIndex = 2
     headerCard.Parent = rightContainer
@@ -433,6 +365,7 @@ function Gui.Init(ModuleManager, Notifications)
     local headerStroke = Instance.new("UIStroke", headerCard)
     headerStroke.Color = Theme.StrokeDim
     headerStroke.Thickness = 1
+    headerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
     local categoryHeaderTitle = Instance.new("TextLabel")
     categoryHeaderTitle.Name = "CategoryTitle"
@@ -447,7 +380,7 @@ function Gui.Init(ModuleManager, Notifications)
     categoryHeaderTitle.ZIndex = 3
     categoryHeaderTitle.Parent = headerCard
 
-    -- Action Buttons (Reload & Close) - Frameless, sleek, rounded
+    -- Action Buttons (Reload & Close)
     local closeBtn = Instance.new("ImageButton")
     closeBtn.Name = "CloseButton"
     closeBtn.Size = UDim2.new(0, 32, 0, 32)
@@ -490,6 +423,7 @@ function Gui.Init(ModuleManager, Notifications)
     local searchStroke = Instance.new("UIStroke", searchContainer)
     searchStroke.Color = Theme.StrokeDim
     searchStroke.Thickness = 1
+    searchStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
     local searchIconImg = Instance.new("ImageLabel")
     searchIconImg.Size = UDim2.new(0, 16, 0, 16)
@@ -516,13 +450,13 @@ function Gui.Init(ModuleManager, Notifications)
     searchInput.ZIndex = 4
     searchInput.Parent = searchContainer
 
-    -- 2. Content Card
+    -- 2. Content Card (Автоматически заполняет всю высоту)
     local contentCard = Instance.new("Frame")
     contentCard.Name = "ContentCard"
     contentCard.Size = UDim2.new(1, 0, 1, -HEADER_HEIGHT - 8)
     contentCard.Position = UDim2.new(0, 0, 0, HEADER_HEIGHT + 8)
     contentCard.BackgroundColor3 = Theme.PanelBg
-    contentCard.BackgroundTransparency = 0.25
+    contentCard.BackgroundTransparency = 0.2
     contentCard.BorderSizePixel = 0
     contentCard.ZIndex = 2
     contentCard.Parent = rightContainer
@@ -531,6 +465,7 @@ function Gui.Init(ModuleManager, Notifications)
     local contentStroke = Instance.new("UIStroke", contentCard)
     contentStroke.Color = Theme.StrokeDim
     contentStroke.Thickness = 1
+    contentStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
     -- Left Pane: Module List Frame
     local MODULE_LIST_WIDTH = 250
@@ -548,7 +483,6 @@ function Gui.Init(ModuleManager, Notifications)
     moduleListFrame.ZIndex = 3
     moduleListFrame.Parent = contentCard
 
-    -- ВАЖНО: Отступы UIPadding исключают срезание обводки карточек движком!
     local listPad = Instance.new("UIPadding", moduleListFrame)
     listPad.PaddingTop = UDim.new(0, 6)
     listPad.PaddingBottom = UDim.new(0, 8)
@@ -569,7 +503,7 @@ function Gui.Init(ModuleManager, Notifications)
     divider.ZIndex = 3
     divider.Parent = contentCard
 
-    -- Right Pane: Inspector / Settings Panel
+    -- Right Pane: Inspector / Settings Panel (Занимает всё оставшееся пространство)
     local INSPECTOR_X = MODULE_LIST_WIDTH + 24
     local inspectorFrame = Instance.new("Frame")
     inspectorFrame.Name = "Inspector"
@@ -592,7 +526,6 @@ function Gui.Init(ModuleManager, Notifications)
     inspectorScroll.ZIndex = 3
     inspectorScroll.Parent = inspectorFrame
 
-    -- ВАЖНО: Отступы UIPadding для инспектора, чтобы карточки не резались!
     local inspPad = Instance.new("UIPadding", inspectorScroll)
     inspPad.PaddingTop = UDim.new(0, 6)
     inspPad.PaddingBottom = UDim.new(0, 12)
@@ -631,13 +564,13 @@ function Gui.Init(ModuleManager, Notifications)
 
     local resizingWindow = false
     local resizeStartMouse = nil
-    local resizeStartScale = 1.0
+    local resizeStartSize  = nil
 
     resizeGrip.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             resizingWindow = true
             resizeStartMouse = input.Position
-            resizeStartScale = menuScale.Scale
+            resizeStartSize = Vector2.new(mainWindow.AbsoluteSize.X, mainWindow.AbsoluteSize.Y)
             dot1.BackgroundColor3 = MenuConfig.AccentColor
             dot2.BackgroundColor3 = MenuConfig.AccentColor
             dot3.BackgroundColor3 = MenuConfig.AccentColor
@@ -668,146 +601,12 @@ function Gui.Init(ModuleManager, Notifications)
             if child:IsA("GuiObject") then child:Destroy() end
         end
 
-        local headerCardMod = Instance.new("Frame")
-        headerCardMod.Name = "SettingsHeader"
-        headerCardMod.Size = UDim2.new(1, 0, 0, 56)
-        headerCardMod.BackgroundColor3 = Theme.CardBg
-        headerCardMod.BorderSizePixel = 0
-        headerCardMod.LayoutOrder = 1
-        headerCardMod.ZIndex = 4
-        headerCardMod.Parent = inspectorScroll
-        Instance.new("UICorner", headerCardMod).CornerRadius = UDim.new(0, 10)
-
-        local hmStroke = Instance.new("UIStroke", headerCardMod)
-        hmStroke.Color = Theme.StrokeDim
-        hmStroke.Thickness = 1
-
-        local titleLbl = Instance.new("TextLabel")
-        titleLbl.Size = UDim2.new(1, -24, 0, 24)
-        titleLbl.Position = UDim2.new(0, 14, 0, 8)
-        titleLbl.BackgroundTransparency = 1
-        titleLbl.Font = MainFont
-        titleLbl.Text = "Настройки интерфейса"
-        titleLbl.TextColor3 = Theme.TextPrimary
-        titleLbl.TextSize = 16
-        titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-        titleLbl.ZIndex = 5
-        titleLbl.Parent = headerCardMod
-
-        local subLbl = Instance.new("TextLabel")
-        subLbl.Size = UDim2.new(1, -24, 0, 16)
-        subLbl.Position = UDim2.new(0, 14, 0, 32)
-        subLbl.BackgroundTransparency = 1
-        subLbl.Font = MainFont
-        subLbl.Text = "Liquid Glass, свечение меню, масштабирование и акценты"
-        subLbl.TextColor3 = MenuConfig.AccentColor
-        registerAccent(subLbl, "TextColor3")
-        subLbl.TextSize = 12
-        subLbl.TextXAlignment = Enum.TextXAlignment.Left
-        subLbl.ZIndex = 5
-        subLbl.Parent = headerCardMod
-
-        local function makeToggleRow(name, desc, state, onToggle, order)
-            local row = Instance.new("Frame")
-            row.Size = UDim2.new(1, 0, 0, 50)
-            row.BackgroundColor3 = Theme.CardBg
-            row.BorderSizePixel = 0
-            row.LayoutOrder = order
-            row.ZIndex = 4
-            row.Parent = inspectorScroll
-            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
-
-            local rStroke = Instance.new("UIStroke", row)
-            rStroke.Color = Theme.StrokeDim
-            rStroke.Thickness = 1
-
-            local nl = Instance.new("TextLabel")
-            nl.Size = UDim2.new(1, -70, 0, 20)
-            nl.Position = UDim2.new(0, 14, 0, 6)
-            nl.BackgroundTransparency = 1
-            nl.Font = MainFont
-            nl.Text = name
-            nl.TextColor3 = Theme.TextPrimary
-            nl.TextSize = 13
-            nl.TextXAlignment = Enum.TextXAlignment.Left
-            nl.ZIndex = 5
-            nl.Parent = row
-
-            local dl = Instance.new("TextLabel")
-            dl.Size = UDim2.new(1, -70, 0, 16)
-            dl.Position = UDim2.new(0, 14, 0, 26)
-            dl.BackgroundTransparency = 1
-            dl.Font = MainFont
-            dl.Text = desc
-            dl.TextColor3 = Theme.TextMuted
-            dl.TextSize = 11
-            dl.TextXAlignment = Enum.TextXAlignment.Left
-            dl.ZIndex = 5
-            dl.Parent = row
-
-            local sw = Instance.new("TextButton")
-            sw.Size = UDim2.new(0, 44, 0, 22)
-            sw.Position = UDim2.new(1, -56, 0.5, -11)
-            sw.BackgroundColor3 = state and MenuConfig.AccentColor or Theme.SwitchOff
-            registerAccent(sw, "BackgroundColor3")
-            sw.BorderSizePixel = 0
-            sw.AutoButtonColor = false
-            sw.Text = ""
-            sw.ZIndex = 5
-            sw.Parent = row
-            Instance.new("UICorner", sw).CornerRadius = UDim.new(1, 0)
-
-            local th = Instance.new("Frame")
-            th.Size = UDim2.new(0, 16, 0, 16)
-            th.Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
-            th.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            th.BorderSizePixel = 0
-            th.ZIndex = 6
-            th.Parent = sw
-            Instance.new("UICorner", th).CornerRadius = UDim.new(1, 0)
-
-            sw.MouseButton1Click:Connect(function()
-                state = not state
-                onToggle(state)
-                playSound(state and Sounds.ToggleOn or Sounds.ToggleOff, 0.45, state and 1.1 or 0.95)
-                tween(sw, { BackgroundColor3 = state and MenuConfig.AccentColor or Theme.SwitchOff }, 0.18, Enum.EasingStyle.Cubic)
-                tween(th, { Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8) }, 0.18, Enum.EasingStyle.Cubic)
-            end)
-        end
-
-        -- Row 2: Liquid Glass
-        makeToggleRow(
-            "Liquid Glass (Жидкое стекло)",
-            "Эффект преломления света и стеклянных граней",
-            MenuConfig.LiquidGlass,
-            function(v)
-                MenuConfig.LiquidGlass = v
-                topSheen.Visible = v
-                strokeGradient.Enabled = v
-                notify("Liquid Glass: " .. (v and "ВКЛ" or "ВЫКЛ"), 1.5, Theme.Success)
-            end,
-            2
-        )
-
-        -- Row 3: Menu Glow (Свечение меню)
-        makeToggleRow(
-            "Свечение меню (Menu Glow)",
-            "Атмосферный неоновый блум вокруг окна",
-            MenuConfig.MenuGlow,
-            function(v)
-                MenuConfig.MenuGlow = v
-                glowShadow.ImageTransparency = v and 0.55 or 1
-                notify("Свечение: " .. (v and "ВКЛ" or "ВЫКЛ"), 1.5, Theme.Success)
-            end,
-            3
-        )
-
-        -- Row 4: Цвет акцента (Presets)
+        -- Row 1: Цвет акцента (Presets)
         local colorCard = Instance.new("Frame")
         colorCard.Size = UDim2.new(1, 0, 0, 76)
         colorCard.BackgroundColor3 = Theme.CardBg
         colorCard.BorderSizePixel = 0
-        colorCard.LayoutOrder = 4
+        colorCard.LayoutOrder = 1
         colorCard.ZIndex = 4
         colorCard.Parent = inspectorScroll
         Instance.new("UICorner", colorCard).CornerRadius = UDim.new(0, 8)
@@ -815,6 +614,7 @@ function Gui.Init(ModuleManager, Notifications)
         local ccStroke = Instance.new("UIStroke", colorCard)
         ccStroke.Color = Theme.StrokeDim
         ccStroke.Thickness = 1
+        ccStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
         local ccTitle = Instance.new("TextLabel")
         ccTitle.Size = UDim2.new(1, -24, 0, 20)
@@ -857,6 +657,7 @@ function Gui.Init(ModuleManager, Notifications)
             local dStroke = Instance.new("UIStroke", dot)
             dStroke.Color = (preset.Color == MenuConfig.AccentColor) and Color3.fromRGB(255, 255, 255) or Theme.StrokeDim
             dStroke.Thickness = 2
+            dStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
             dot.MouseButton1Click:Connect(function()
                 applyAccentColor(preset.Color)
@@ -866,12 +667,12 @@ function Gui.Init(ModuleManager, Notifications)
             end)
         end
 
-        -- Row 5: Прозрачность окна (Slider)
+        -- Row 2: Прозрачность окна (Slider)
         local opCard = Instance.new("Frame")
         opCard.Size = UDim2.new(1, 0, 0, 58)
         opCard.BackgroundColor3 = Theme.CardBg
         opCard.BorderSizePixel = 0
-        opCard.LayoutOrder = 5
+        opCard.LayoutOrder = 2
         opCard.ZIndex = 4
         opCard.Parent = inspectorScroll
         Instance.new("UICorner", opCard).CornerRadius = UDim.new(0, 8)
@@ -879,6 +680,7 @@ function Gui.Init(ModuleManager, Notifications)
         local opStroke = Instance.new("UIStroke", opCard)
         opStroke.Color = Theme.StrokeDim
         opStroke.Thickness = 1
+        opStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
         local opTitle = Instance.new("TextLabel")
         opTitle.Size = UDim2.new(0.6, 0, 0, 20)
@@ -936,6 +738,7 @@ function Gui.Init(ModuleManager, Notifications)
         opThStroke.Color = MenuConfig.AccentColor
         registerAccent(opThStroke, "Color")
         opThStroke.Thickness = 2
+        opThStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
         local opHit = Instance.new("TextButton")
         opHit.Size = UDim2.new(1, 0, 0, 26)
@@ -965,110 +768,6 @@ function Gui.Init(ModuleManager, Notifications)
             }
             local mouseLoc = UserInputService:GetMouseLocation()
             updateOp(mouseLoc.X)
-        end)
-
-        -- Row 6: Масштаб меню GUI Scale (Slider)
-        local scaleCard = Instance.new("Frame")
-        scaleCard.Size = UDim2.new(1, 0, 0, 58)
-        scaleCard.BackgroundColor3 = Theme.CardBg
-        scaleCard.BorderSizePixel = 0
-        scaleCard.LayoutOrder = 6
-        scaleCard.ZIndex = 4
-        scaleCard.Parent = inspectorScroll
-        Instance.new("UICorner", scaleCard).CornerRadius = UDim.new(0, 8)
-
-        local scStroke = Instance.new("UIStroke", scaleCard)
-        scStroke.Color = Theme.StrokeDim
-        scStroke.Thickness = 1
-
-        local scTitle = Instance.new("TextLabel")
-        scTitle.Size = UDim2.new(0.6, 0, 0, 20)
-        scTitle.Position = UDim2.new(0, 14, 0, 8)
-        scTitle.BackgroundTransparency = 1
-        scTitle.Font = MainFont
-        scTitle.Text = "Масштаб интерфейса (GUI Scale)"
-        scTitle.TextColor3 = Theme.TextPrimary
-        scTitle.TextSize = 13
-        scTitle.TextXAlignment = Enum.TextXAlignment.Left
-        scTitle.ZIndex = 5
-        scTitle.Parent = scaleCard
-
-        local scValLbl = Instance.new("TextLabel")
-        scValLbl.Size = UDim2.new(0, 60, 0, 20)
-        scValLbl.Position = UDim2.new(1, -74, 0, 8)
-        scValLbl.BackgroundTransparency = 1
-        scValLbl.Font = MainFont
-        scValLbl.Text = string.format("%.0f%%", menuScale.Scale * 100)
-        scValLbl.TextColor3 = MenuConfig.AccentColor
-        registerAccent(scValLbl, "TextColor3")
-        scValLbl.TextSize = 13
-        scValLbl.TextXAlignment = Enum.TextXAlignment.Right
-        scValLbl.ZIndex = 5
-        scValLbl.Parent = scaleCard
-
-        local scBarBg = Instance.new("Frame")
-        scBarBg.Size = UDim2.new(1, -28, 0, 5)
-        scBarBg.Position = UDim2.new(0, 14, 0, 36)
-        scBarBg.BackgroundColor3 = Color3.fromRGB(34, 39, 58)
-        scBarBg.BorderSizePixel = 0
-        scBarBg.ZIndex = 5
-        scBarBg.Parent = scaleCard
-        Instance.new("UICorner", scBarBg).CornerRadius = UDim.new(1, 0)
-
-        local scNorm = math.clamp((menuScale.Scale - 0.75) / (1.40 - 0.75), 0, 1)
-
-        local scBarFill = Instance.new("Frame")
-        scBarFill.Size = UDim2.new(scNorm, 0, 1, 0)
-        scBarFill.BackgroundColor3 = MenuConfig.AccentColor
-        registerAccent(scBarFill, "BackgroundColor3")
-        scBarFill.BorderSizePixel = 0
-        scBarFill.ZIndex = 6
-        scBarFill.Parent = scBarBg
-        Instance.new("UICorner", scBarFill).CornerRadius = UDim.new(1, 0)
-
-        local scThumb = Instance.new("Frame")
-        scThumb.Size = UDim2.new(0, 14, 0, 14)
-        scThumb.Position = UDim2.new(scNorm, -7, 0.5, -7)
-        scThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        scThumb.BorderSizePixel = 0
-        scThumb.ZIndex = 8
-        scThumb.Parent = scBarBg
-        Instance.new("UICorner", scThumb).CornerRadius = UDim.new(1, 0)
-
-        local scThStroke = Instance.new("UIStroke", scThumb)
-        scThStroke.Color = MenuConfig.AccentColor
-        registerAccent(scThStroke, "Color")
-        scThStroke.Thickness = 2
-
-        local scHit = Instance.new("TextButton")
-        scHit.Size = UDim2.new(1, 0, 0, 26)
-        scHit.Position = UDim2.new(0, 0, 0, 24)
-        scHit.BackgroundTransparency = 1
-        scHit.Text = ""
-        scHit.ZIndex = 9
-        scHit.Parent = scaleCard
-
-        local function updateScale(inputX)
-            local absPos = scBarBg.AbsolutePosition.X
-            local absSize = scBarBg.AbsoluteSize.X
-            if absSize <= 0 then return end
-            local p = math.clamp((inputX - absPos) / absSize, 0, 1)
-            local targetScale = 0.75 + p * (1.40 - 0.75)
-            targetScale = math.floor(targetScale * 100 + 0.5) / 100
-            setGuiScale(targetScale)
-            scBarFill.Size = UDim2.new(p, 0, 1, 0)
-            scThumb.Position = UDim2.new(p, -7, 0.5, -7)
-            scValLbl.Text = string.format("%.0f%%", targetScale * 100)
-        end
-
-        scHit.MouseButton1Down:Connect(function()
-            inspectorScroll.ScrollingEnabled = false
-            currentDraggingSlider = {
-                update = updateScale,
-                finish = function() inspectorScroll.ScrollingEnabled = true end
-            }
-            local mouseLoc = UserInputService:GetMouseLocation()
-            updateScale(mouseLoc.X)
         end)
     end
 
@@ -1121,6 +820,7 @@ function Gui.Init(ModuleManager, Notifications)
         local hmStroke = Instance.new("UIStroke", headerCardMod)
         hmStroke.Color = Theme.StrokeDim
         hmStroke.Thickness = 1
+        hmStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
         local modNameLbl = Instance.new("TextLabel")
         modNameLbl.Size = UDim2.new(0.65, 0, 0, 24)
@@ -1188,7 +888,7 @@ function Gui.Init(ModuleManager, Notifications)
             end
         end)
 
-        -- Keybind Row (Элегантный бейдж справа как в Rich ModernBindWidget)
+        -- Keybind Row (Стильный бейдж справа с чистым, неслипающимся текстом!)
         local kbRow = Instance.new("Frame")
         kbRow.Size = UDim2.new(1, 0, 0, 42)
         kbRow.BackgroundColor3 = Theme.CardBg
@@ -1201,9 +901,10 @@ function Gui.Init(ModuleManager, Notifications)
         local kbStroke = Instance.new("UIStroke", kbRow)
         kbStroke.Color = Theme.StrokeDim
         kbStroke.Thickness = 1
+        kbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
         local kbLabel = Instance.new("TextLabel")
-        kbLabel.Size = UDim2.new(0.6, 0, 1, 0)
+        kbLabel.Size = UDim2.new(0.55, 0, 1, 0)
         kbLabel.Position = UDim2.new(0, 14, 0, 0)
         kbLabel.BackgroundTransparency = 1
         kbLabel.Font = MainFont
@@ -1214,47 +915,61 @@ function Gui.Init(ModuleManager, Notifications)
         kbLabel.ZIndex = 5
         kbLabel.Parent = kbRow
 
+        -- Контейнер кнопки бинда (Frame с явным UIStroke на границе, текст внутри чистый!)
         local boundKey = ModuleManager.Keybinds[mod.Name]
-        local kbBtn = Instance.new("TextButton")
-        kbBtn.AnchorPoint = Vector2.new(1, 0.5)
-        kbBtn.Size = UDim2.new(0, 84, 0, 24)
-        kbBtn.Position = UDim2.new(1, -12, 0.5, 0)
-        kbBtn.BackgroundColor3 = Color3.fromRGB(28, 33, 50)
-        kbBtn.BorderSizePixel = 0
-        kbBtn.AutoButtonColor = false
-        kbBtn.Font = MainFont
-        kbBtn.TextSize = 12
-        kbBtn.TextColor3 = boundKey and MenuConfig.AccentColor or Theme.TextMuted
-        kbBtn.Text = boundKey and ("[" .. boundKey .. "]") or "[ Нет ]"
-        kbBtn.ZIndex = 5
-        kbBtn.Parent = kbRow
-        Instance.new("UICorner", kbBtn).CornerRadius = UDim.new(0, 6)
+        local kbPill = Instance.new("Frame")
+        kbPill.AnchorPoint = Vector2.new(1, 0.5)
+        kbPill.Size = UDim2.new(0, 96, 0, 24)
+        kbPill.Position = UDim2.new(1, -12, 0.5, 0)
+        kbPill.BackgroundColor3 = Color3.fromRGB(28, 33, 50)
+        kbPill.BorderSizePixel = 0
+        kbPill.ZIndex = 5
+        kbPill.Parent = kbRow
+        Instance.new("UICorner", kbPill).CornerRadius = UDim.new(0, 6)
 
-        local kbBtnStroke = Instance.new("UIStroke", kbBtn)
-        kbBtnStroke.Color = boundKey and MenuConfig.AccentColor or Theme.StrokeDim
-        kbBtnStroke.Thickness = 1.2
+        local kbPillStroke = Instance.new("UIStroke", kbPill)
+        kbPillStroke.Color = boundKey and MenuConfig.AccentColor or Theme.StrokeDim
+        kbPillStroke.Thickness = 1.2
+        kbPillStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-        kbBtn.MouseButton1Click:Connect(function()
+        local kbText = Instance.new("TextLabel")
+        kbText.Size = UDim2.new(1, 0, 1, 0)
+        kbText.BackgroundTransparency = 1
+        kbText.Font = MainFont
+        kbText.TextSize = 12
+        kbText.TextColor3 = boundKey and MenuConfig.AccentColor or Theme.TextMuted
+        kbText.Text = boundKey and ("[" .. boundKey .. "]") or "[ Нет ]"
+        kbText.ZIndex = 6
+        kbText.Parent = kbPill
+
+        local kbClick = Instance.new("TextButton")
+        kbClick.Size = UDim2.new(1, 0, 1, 0)
+        kbClick.BackgroundTransparency = 1
+        kbClick.Text = ""
+        kbClick.ZIndex = 7
+        kbClick.Parent = kbPill
+
+        kbClick.MouseButton1Click:Connect(function()
             if keybindListening then return end
             keybindListening = true
             playSound(Sounds.ButtonClick, 0.5, 1.2)
-            kbBtn.Text = "[ Нажмите... ]"
-            kbBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            kbBtn.BackgroundColor3 = MenuConfig.AccentColor
-            kbBtnStroke.Color = Color3.fromRGB(255, 255, 255)
+            kbText.Text = "[ Нажмите... ]"
+            kbText.TextColor3 = Color3.fromRGB(255, 255, 255)
+            kbPill.BackgroundColor3 = MenuConfig.AccentColor
+            kbPillStroke.Color = Color3.fromRGB(255, 255, 255)
 
             keybindCallback = function(input)
                 keybindListening = false
                 keybindCallback = nil
-                kbBtn.BackgroundColor3 = Color3.fromRGB(28, 33, 50)
+                kbPill.BackgroundColor3 = Color3.fromRGB(28, 33, 50)
 
                 local keyName = nil
                 if input.UserInputType == Enum.UserInputType.Keyboard then
                     if input.KeyCode == Enum.KeyCode.Backspace or input.KeyCode == Enum.KeyCode.Escape then
                         ModuleManager.Keybinds[mod.Name] = nil
-                        kbBtn.Text = "[ Нет ]"
-                        kbBtn.TextColor3 = Theme.TextMuted
-                        kbBtnStroke.Color = Theme.StrokeDim
+                        kbText.Text = "[ Нет ]"
+                        kbText.TextColor3 = Theme.TextMuted
+                        kbPillStroke.Color = Theme.StrokeDim
                         playSound(Sounds.ToggleOff, 0.4, 0.9)
                         for _, item in ipairs(moduleCardItems) do
                             if item.mod == mod and item.kbTag then item.kbTag.Text = "" end
@@ -1267,19 +982,25 @@ function Gui.Init(ModuleManager, Notifications)
                     keyName = "Mouse1"
                 elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
                     keyName = "Mouse2"
+                elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+                    keyName = "Mouse3"
                 end
 
-                if keyName then
+                if keyName and keyName ~= "Unknown" then
                     ModuleManager.Keybinds[mod.Name] = keyName
-                    kbBtn.Text = "[" .. keyName .. "]"
-                    kbBtn.TextColor3 = MenuConfig.AccentColor
-                    kbBtnStroke.Color = MenuConfig.AccentColor
+                    kbText.Text = "[" .. keyName .. "]"
+                    kbText.TextColor3 = MenuConfig.AccentColor
+                    kbPillStroke.Color = MenuConfig.AccentColor
                     playSound(Sounds.ButtonClick, 0.5, 1.1)
                     for _, item in ipairs(moduleCardItems) do
                         if item.mod == mod and item.kbTag then
                             item.kbTag.Text = "[" .. keyName:sub(1, 4) .. "]"
                         end
                     end
+                else
+                    kbText.Text = boundKey and ("[" .. boundKey .. "]") or "[ Нет ]"
+                    kbText.TextColor3 = boundKey and MenuConfig.AccentColor or Theme.TextMuted
+                    kbPillStroke.Color = boundKey and MenuConfig.AccentColor or Theme.StrokeDim
                 end
             end
         end)
@@ -1319,6 +1040,7 @@ function Gui.Init(ModuleManager, Notifications)
                     local sStroke = Instance.new("UIStroke", card)
                     sStroke.Color = Theme.StrokeDim
                     sStroke.Thickness = 1
+                    sStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
                     local lbl = Instance.new("TextLabel")
                     lbl.Size = UDim2.new(0.65, 0, 0, 22)
@@ -1346,6 +1068,7 @@ function Gui.Init(ModuleManager, Notifications)
                     vbStroke.Color = MenuConfig.AccentColor
                     registerAccent(vbStroke, "Color")
                     vbStroke.Thickness = 1
+                    vbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
                     local valLbl = Instance.new("TextLabel")
                     valLbl.Size = UDim2.new(1, 0, 1, 0)
@@ -1358,7 +1081,7 @@ function Gui.Init(ModuleManager, Notifications)
                     valLbl.ZIndex = 6
                     valLbl.Parent = valBadge
 
-                    -- Track Bar (Clean, Solid Luminous Bar WITHOUT ugly white stripe!)
+                    -- Track Bar (Сплошной акцентный трек без белой полосы)
                     local barBg = Instance.new("Frame")
                     barBg.Size = UDim2.new(1, -28, 0, 5)
                     barBg.Position = UDim2.new(0, 14, 0, 36)
@@ -1379,7 +1102,7 @@ function Gui.Init(ModuleManager, Notifications)
                     barFill.Parent = barBg
                     Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
 
-                    -- REAL VISIBLE DRAGGABLE THUMB KNOB (14x14)
+                    -- Бегунок 14x14
                     local thumb = Instance.new("Frame")
                     thumb.Name = "SliderThumb"
                     thumb.Size = UDim2.new(0, 14, 0, 14)
@@ -1394,8 +1117,8 @@ function Gui.Init(ModuleManager, Notifications)
                     thStroke.Color = MenuConfig.AccentColor
                     registerAccent(thStroke, "Color")
                     thStroke.Thickness = 2
+                    thStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-                    -- ШИРОКАЯ ЗОНА ЗАХВАТА: исключает срыв при быстром движении!
                     local hitArea = Instance.new("TextButton")
                     hitArea.Size = UDim2.new(1, 0, 0, 26)
                     hitArea.Position = UDim2.new(0, 0, 0, 24)
@@ -1453,6 +1176,7 @@ function Gui.Init(ModuleManager, Notifications)
                     local tStroke = Instance.new("UIStroke", row)
                     tStroke.Color = Theme.StrokeDim
                     tStroke.Thickness = 1
+                    tStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
                     local lbl = Instance.new("TextLabel")
                     lbl.Size = UDim2.new(1, -66, 1, 0)
@@ -1515,6 +1239,7 @@ function Gui.Init(ModuleManager, Notifications)
                     local dStroke = Instance.new("UIStroke", row)
                     dStroke.Color = Theme.StrokeDim
                     dStroke.Thickness = 1
+                    dStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
                     local lbl = Instance.new("TextLabel")
                     lbl.Size = UDim2.new(0.5, 0, 1, 0)
@@ -1667,6 +1392,7 @@ function Gui.Init(ModuleManager, Notifications)
             local cardStroke = Instance.new("UIStroke", card)
             cardStroke.Color = (selectedModule == mod) and MenuConfig.AccentColor or Theme.StrokeDim
             cardStroke.Thickness = 1.2
+            cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
             local nameLbl = Instance.new("TextLabel")
             nameLbl.Size = UDim2.new(1, -95, 1, 0)
@@ -1682,8 +1408,8 @@ function Gui.Init(ModuleManager, Notifications)
             nameLbl.Parent = card
 
             local kbTag = Instance.new("TextLabel")
-            kbTag.Size = UDim2.new(0, 32, 0, 16)
-            kbTag.Position = UDim2.new(1, -88, 0.5, -8)
+            kbTag.Size = UDim2.new(0, 36, 0, 16)
+            kbTag.Position = UDim2.new(1, -92, 0.5, -8)
             kbTag.BackgroundTransparency = 1
             kbTag.Font = MainFont
             kbTag.Text = ModuleManager.Keybinds[mod.Name] and ("[" .. ModuleManager.Keybinds[mod.Name]:sub(1, 4) .. "]") or ""
@@ -1730,7 +1456,6 @@ function Gui.Init(ModuleManager, Notifications)
                 tween(th, { Position = mod.Enabled and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7) }, 0.18, Enum.EasingStyle.Cubic)
             end
 
-            -- ПЛАВНЫЕ АНИМАЦИИ НАВЕДЕНИЯ НА КАРТОЧКУ
             selectBtn.MouseEnter:Connect(function()
                 if selectedModule ~= mod then
                     tween(card, { BackgroundColor3 = Theme.CardHover }, 0.12)
@@ -1751,7 +1476,8 @@ function Gui.Init(ModuleManager, Notifications)
                 end
             end)
 
-            selectBtn.MouseButton1Click:Connect(function()
+            -- Выбор функции по ЛКМ ИЛИ ПО ПКМ!
+            local function onSelectModule()
                 if selectedModule ~= mod then
                     selectedModule = mod
                     playSound(Sounds.TabClick, 0.35, 1.1)
@@ -1760,7 +1486,10 @@ function Gui.Init(ModuleManager, Notifications)
                     end
                     renderInspector(mod)
                 end
-            end)
+            end
+
+            selectBtn.MouseButton1Click:Connect(onSelectModule)
+            selectBtn.MouseButton2Click:Connect(onSelectModule)
 
             table.insert(moduleCardItems, {
                 mod = mod,
@@ -1790,6 +1519,7 @@ function Gui.Init(ModuleManager, Notifications)
         btnStroke.Color = (selectedCategory == cat.Id) and MenuConfig.AccentColor or Color3.fromRGB(0, 0, 0)
         btnStroke.Transparency = (selectedCategory == cat.Id) and 0 or 1
         btnStroke.Thickness = 1
+        btnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
         local iconImg = Instance.new("ImageLabel")
         iconImg.Size = UDim2.new(0, 20, 0, 20)
@@ -1895,7 +1625,7 @@ function Gui.Init(ModuleManager, Notifications)
         setMenuOpen(false)
     end)
 
-    -- ========== DRAGGING & LIVE RESIZING LOGIC ==========
+    -- ========== DRAGGING & LIVE 2D RESIZING LOGIC ==========
     local draggingWindow = false
     local dragStartMouse = nil
     local frameStartPos  = nil
@@ -1922,15 +1652,16 @@ function Gui.Init(ModuleManager, Notifications)
                 frameStartPos.Y.Scale, frameStartPos.Y.Offset + delta.Y
             )
             mainWindow.Position = newPos
-            glowShadow.Position = newPos
         end
 
-        -- 2. Динамическое масштабирование через 3 точки (UIScale)
+        -- 2. Свободное растягивание в стороны и вниз (Ресайз ширины и высоты)
         if resizingWindow and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - resizeStartMouse
-            local scaleDelta = (delta.X / BASE_WIDTH + delta.Y / BASE_HEIGHT) / 2
-            local newScale = math.clamp(resizeStartScale + scaleDelta, 0.70, 1.45)
-            setGuiScale(newScale)
+            local newW = math.clamp(resizeStartSize.X + delta.X, MIN_WIDTH, MAX_WIDTH)
+            local newH = math.clamp(resizeStartSize.Y + delta.Y, MIN_HEIGHT, MAX_HEIGHT)
+            currentWidth = newW
+            currentHeight = newH
+            mainWindow.Size = UDim2.new(0, newW, 0, newH)
         end
 
         -- 3. Плавное перетаскивание ползунков (Никогда не срывается!)
@@ -1957,78 +1688,46 @@ function Gui.Init(ModuleManager, Notifications)
         end
     end)
 
-    -- ========== OPEN / CLOSE ANIMATIONS (SMOOTH POP-IN SCALE) ==========
+    -- ========== OPEN / CLOSE ANIMATIONS ==========
     local function playOpenAnim()
         screenGui.Enabled = true
         playSound(Sounds.MenuOpen, 0.45, 1.0)
-        local targetScale = MenuConfig.MenuScale
 
-        menuScale.Scale = targetScale * 0.88
-        glowScale.Scale = targetScale * 0.88
         mainWindow.BackgroundTransparency = 1
-        glowShadow.ImageTransparency = 1
-
-        TweenService:Create(
-            menuScale,
-            TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-            { Scale = targetScale }
-        ):Play()
-
-        TweenService:Create(
-            glowScale,
-            TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-            { Scale = targetScale }
-        ):Play()
+        mainStroke.Transparency = 1
 
         TweenService:Create(
             mainWindow,
-            TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            TweenInfo.new(0.20, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
             { BackgroundTransparency = 1 - MenuConfig.WindowOpacity }
         ):Play()
 
-        if MenuConfig.MenuGlow then
-            TweenService:Create(
-                glowShadow,
-                TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                { ImageTransparency = 0.55 }
-            ):Play()
-        end
+        TweenService:Create(
+            mainStroke,
+            TweenInfo.new(0.20, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+            { Transparency = 0 }
+        ):Play()
     end
 
     local function playCloseAnim()
-        local targetScale = MenuConfig.MenuScale
         playSound(Sounds.MenuClose, 0.4, 0.95)
 
         local t = TweenService:Create(
-            menuScale,
-            TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
-            { Scale = targetScale * 0.90 }
+            mainWindow,
+            TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            { BackgroundTransparency = 1 }
         )
         t:Play()
 
         TweenService:Create(
-            glowScale,
-            TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
-            { Scale = targetScale * 0.90 }
-        ):Play()
-
-        TweenService:Create(
-            mainWindow,
+            mainStroke,
             TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            { BackgroundTransparency = 1 }
-        ):Play()
-
-        TweenService:Create(
-            glowShadow,
-            TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            { ImageTransparency = 1 }
+            { Transparency = 1 }
         ):Play()
 
         t.Completed:Connect(function()
             if not menuOpen then
                 screenGui.Enabled = false
-                menuScale.Scale = targetScale
-                glowScale.Scale = targetScale
             end
         end)
     end
@@ -2046,7 +1745,7 @@ function Gui.Init(ModuleManager, Notifications)
             return
         end
 
-        -- 2. Если игрок печатает в чате или поиске, не триггерим читы
+        -- 2. Если игрок печатает в чате или поиске, не перехватываем
         if UserInputService:GetFocusedTextBox() ~= nil then
             return
         end
@@ -2057,61 +1756,44 @@ function Gui.Init(ModuleManager, Notifications)
                 setMenuOpen(not menuOpen)
                 return
             end
-
-            -- 4. Срабатывание биндов модулей в игре
-            if not menuOpen then
-                local keyName = input.KeyCode.Name
-                for modName, boundKey in pairs(ModuleManager.Keybinds) do
-                    if boundKey == keyName then
-                        local mod = ModuleManager:GetModuleByName(modName)
-                        if mod then
-                            ModuleManager:SetEnabled(mod, not mod.Enabled)
-                            playSound(mod.Enabled and Sounds.ToggleOn or Sounds.ToggleOff, 0.45, mod.Enabled and 1.1 or 0.95)
-                            for _, item in ipairs(moduleCardItems) do
-                                if item.mod == mod and item.updateState then
-                                    item.updateState()
-                                end
-                            end
-                            if selectedModule == mod and selectedCategory ~= "SETTINGS" then
-                                renderInspector(mod)
-                            end
-                            if mod.Enabled then
-                                notify(mod.Name .. " включён", 2, Theme.Success)
-                            else
-                                notify(mod.Name .. " выключен", 2, Theme.Danger)
-                            end
-                        end
-                        break
-                    end
-                end
-            end
         end
 
-        -- 5. Бинды на кнопки мыши (Mouse1, Mouse2)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
-            if not menuOpen and not keybindListening then
-                local keyName = input.UserInputType == Enum.UserInputType.MouseButton1 and "Mouse1" or "Mouse2"
-                for modName, boundKey in pairs(ModuleManager.Keybinds) do
-                    if boundKey == keyName then
-                        local mod = ModuleManager:GetModuleByName(modName)
-                        if mod then
-                            ModuleManager:SetEnabled(mod, not mod.Enabled)
-                            playSound(mod.Enabled and Sounds.ToggleOn or Sounds.ToggleOff, 0.45, mod.Enabled and 1.1 or 0.95)
-                            for _, item in ipairs(moduleCardItems) do
-                                if item.mod == mod and item.updateState then
-                                    item.updateState()
-                                end
-                            end
-                            if selectedModule == mod and selectedCategory ~= "SETTINGS" then
-                                renderInspector(mod)
-                            end
-                            if mod.Enabled then
-                                notify(mod.Name .. " включён", 2, Theme.Success)
-                            else
-                                notify(mod.Name .. " выключен", 2, Theme.Danger)
+        -- 4. Срабатывание биндов модулей (И в игре, И когда открыто меню!)
+        local keyName = nil
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            keyName = input.KeyCode.Name
+        elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+            keyName = "Mouse1"
+        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+            keyName = "Mouse2"
+        elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+            keyName = "Mouse3"
+        end
+
+        if keyName and keyName ~= "Unknown" then
+            for modName, boundKey in pairs(ModuleManager.Keybinds) do
+                if boundKey == keyName then
+                    local mod = ModuleManager:GetModuleByName(modName)
+                    if mod then
+                        local newState = not mod.Enabled
+                        ModuleManager:SetEnabled(mod, newState)
+                        playSound(newState and Sounds.ToggleOn or Sounds.ToggleOff, 0.45, newState and 1.1 or 0.95)
+
+                        -- Мгновенно обновляем переключатели на карточке
+                        for _, item in ipairs(moduleCardItems) do
+                            if item.mod == mod and item.updateState then
+                                item.updateState()
                             end
                         end
-                        break
+                        if selectedModule == mod and selectedCategory ~= "SETTINGS" then
+                            renderInspector(mod)
+                        end
+
+                        if newState then
+                            notify(mod.Name .. " [ВКЛЮЧЁН]", 2.5, Theme.Success)
+                        else
+                            notify(mod.Name .. " [ВЫКЛЮЧЕН]", 2.5, Theme.Danger)
+                        end
                     end
                 end
             end

@@ -16,12 +16,23 @@ function Notifications:Init()
         if gethui then parent = gethui() end
     end)
 
+    pcall(function()
+        local old = parent:FindFirstChild("XclientNotificationGui")
+        if old then old:Destroy() end
+    end)
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "XclientNotificationGui"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.Parent = parent
+
     local container = Instance.new("Frame")
     container.Name = "XclientNotifications"
     container.Size = UDim2.new(0, 300, 1, 0)
     container.Position = UDim2.new(1, -310, 0, 10)
     container.BackgroundTransparency = 1
-    container.Parent = parent
+    container.Parent = screenGui
 
     local layout = Instance.new("UIListLayout", container)
     layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -64,7 +75,7 @@ function Notifications:_show(text, color, duration)
     label.Size = UDim2.new(1, -16, 1, 0)
     label.Position = UDim2.new(0, 8, 0, 0)
     label.BackgroundTransparency = 1
-    label.Font = Enum.Font.Gotham
+    label.Font = Enum.Font.GothamBold
     label.Text = text
     label.TextColor3 = Color3.fromRGB(240, 240, 255)
     label.TextSize = 13
@@ -122,19 +133,19 @@ function Notifications:Show(text, duration, color)
 end
 
 function Notifications:Success(text, duration)
-    self:Show(text, duration or 3, Color3.fromRGB(45, 100, 65))
+    self:Show(text, duration or 3, Color3.fromRGB(34, 197, 94))
 end
 
 function Notifications:Error(text, duration)
-    self:Show(text, duration or 4, Color3.fromRGB(120, 40, 45))
+    self:Show(text, duration or 4, Color3.fromRGB(239, 68, 68))
 end
 
 function Notifications:Warn(text, duration)
-    self:Show(text, duration or 3, Color3.fromRGB(120, 95, 30))
+    self:Show(text, duration or 3, Color3.fromRGB(245, 158, 11))
 end
 
 function Notifications:Info(text, duration)
-    self:Show(text, duration or 3, Color3.fromRGB(45, 70, 120))
+    self:Show(text, duration or 3, Color3.fromRGB(56, 189, 248))
 end
 
 return Notifications
