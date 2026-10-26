@@ -5,56 +5,57 @@ function Gui.Init(ModuleManager, Notifications)
     local CoreGui          = game:GetService("CoreGui")
     local TweenService     = game:GetService("TweenService")
     local RunService       = game:GetService("RunService")
+    local Players          = game:GetService("Players")
+
+    local LocalPlayer = Players.LocalPlayer
 
     local parent = CoreGui
     pcall(function()
         if gethui then parent = gethui() end
     end)
 
-    -- ========== THEME PALETTE ==========
+    -- ========== RICH-MODERN THEME PALETTE ==========
     local Theme = {
-        BgBase        = Color3.fromRGB(13, 14, 22),       -- Глубокий темный
-        CardBg        = Color3.fromRGB(18, 20, 32),       -- Фон колонок
-        CardHeader    = Color3.fromRGB(24, 26, 42),       -- Заголовок колонок
-        ItemBg        = Color3.fromRGB(25, 27, 44),       -- Модуль выключен
-        ItemHover     = Color3.fromRGB(34, 38, 62),       -- Модуль hover
-        ItemActive    = Color3.fromRGB(99, 102, 241),      -- Модуль включен (Индиго/Неон)
-        ItemActiveDot = Color3.fromRGB(56, 189, 248),      -- Светящаяся точка (Циан)
-        StrokeNormal  = Color3.fromRGB(36, 39, 60),       -- Обводка обычная
-        StrokeAccent  = Color3.fromRGB(99, 102, 241),      -- Обводка активная
-        TextPrimary   = Color3.fromRGB(241, 245, 249),     -- Белый текст
-        TextSecondary = Color3.fromRGB(148, 163, 184),     -- Серый текст
-        TextMuted     = Color3.fromRGB(90, 100, 125),      -- Приглушенный текст
-        Success       = Color3.fromRGB(16, 185, 129),      -- Зеленый
-        Danger        = Color3.fromRGB(239, 68, 68),       -- Красный
-        AccentGrad    = Color3.fromRGB(139, 92, 246),      -- Пурпур
+        WindowBg       = Color3.fromRGB(15, 17, 24),        -- Главный фон окна (Obsidian)
+        PanelBg        = Color3.fromRGB(20, 23, 34),        -- Фон внутренних карточек
+        PanelHeader    = Color3.fromRGB(25, 29, 44),        -- Фон шапок карточек
+        CardBg         = Color3.fromRGB(24, 28, 42),        -- Фон элементов/модулей
+        CardHover      = Color3.fromRGB(32, 38, 58),        -- При наведении
+        CardSelected   = Color3.fromRGB(36, 42, 66),        -- Выбранный модуль
+        Accent         = Color3.fromRGB(120, 100, 255),     -- Фирменный Rich-акцент (Electric Purple/Indigo)
+        AccentGlow     = Color3.fromRGB(168, 130, 255),     -- Неоновое свечение
+        AccentCyan     = Color3.fromRGB(56, 189, 248),      -- Циан акцент
+        StrokeDim      = Color3.fromRGB(36, 41, 60),        -- Тонкая рамка (неактивная)
+        StrokeHover    = Color3.fromRGB(60, 68, 100),       -- Рамка при наведении
+        StrokeActive   = Color3.fromRGB(120, 100, 255),     -- Рамка активная
+        TextPrimary    = Color3.fromRGB(245, 247, 250),     -- Яркий белый
+        TextSecondary  = Color3.fromRGB(156, 163, 175),     -- Светло-серый
+        TextMuted      = Color3.fromRGB(100, 108, 128),     -- Приглушенный
+        Success        = Color3.fromRGB(34, 197, 94),       -- Зеленый
+        Danger         = Color3.fromRGB(239, 68, 68),       -- Красный
+        SwitchOff      = Color3.fromRGB(36, 41, 58),        -- Выключенный свитч
+        SwitchOn       = Color3.fromRGB(120, 100, 255),     -- Включенный свитч
     }
 
-    -- Цвета плашек категорий
-    local CategoryColors = {
-        ["Combat"]   = Color3.fromRGB(239, 68, 68),   -- Красный
-        ["Movement"] = Color3.fromRGB(56, 189, 248),  -- Голубой
-        ["Visuals"]  = Color3.fromRGB(168, 85, 247),  -- Фиолетовый
-        ["Player"]   = Color3.fromRGB(34, 197, 94),   -- Зеленый
-        ["Misc"]     = Color3.fromRGB(245, 158, 11),  -- Янтарный
-    }
-
-    local CategoryIcons = {
-        ["Combat"]   = "⚔",
-        ["Movement"] = "⚡",
-        ["Visuals"]  = "👁",
-        ["Player"]   = "🎯",
-        ["Misc"]     = "⚙",
+    local CategoryData = {
+        { Id = "ALL",      Name = "Все модули",  Icon = "★" },
+        { Id = "Combat",   Name = "Combat",      Icon = "⚔" },
+        { Id = "Movement", Name = "Movement",    Icon = "⚡" },
+        { Id = "Visuals",  Name = "Visuals",     Icon = "👁" },
+        { Id = "Player",   Name = "Player",      Icon = "🎯" },
+        { Id = "Misc",     Name = "Misc",        Icon = "⚙" },
     }
 
     -- ========== STATE ==========
-    local allButtons       = {}
-    local settingsOpen     = false
-    local settingsModName  = nil
-    local menuOpen         = false
-    local keybindListening = false
-    local keybindCallback  = nil
-    local activeModulesCountLabel = nil
+    local menuOpen             = false
+    local selectedCategory     = "Combat"
+    local selectedModule       = nil
+    local keybindListening     = false
+    local keybindCallback      = nil
+    local searchQuery          = ""
+
+    local moduleCardItems      = {}  -- Карточки модулей в списке
+    local categoryButtons      = {}  -- Кнопки в сайдбаре
 
     -- ========== SCREEN GUI ==========
     local screenGui = Instance.new("ScreenGui")
@@ -64,364 +65,498 @@ function Gui.Init(ModuleManager, Notifications)
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     screenGui.Parent = parent
 
-    -- ========== DRAG ROOT FRAME ==========
-    local totalWidth = 1040
-    local totalHeight = 490
+    -- ========== MAIN WINDOW (RICH-MODERN FRAME) ==========
+    local WIN_WIDTH  = 780
+    local WIN_HEIGHT = 490
 
-    local dragFrame = Instance.new("Frame")
-    dragFrame.Name = "DragRoot"
-    dragFrame.Size = UDim2.new(0, totalWidth, 0, totalHeight)
-    dragFrame.Position = UDim2.new(0.5, -totalWidth / 2, 0.5, -totalHeight / 2)
-    dragFrame.BackgroundTransparency = 1
-    dragFrame.Parent = screenGui
+    local mainWindow = Instance.new("Frame")
+    mainWindow.Name = "RichModernWindow"
+    mainWindow.Size = UDim2.new(0, WIN_WIDTH, 0, WIN_HEIGHT)
+    mainWindow.Position = UDim2.new(0.5, -WIN_WIDTH / 2, 0.5, -WIN_HEIGHT / 2)
+    mainWindow.BackgroundColor3 = Theme.WindowBg
+    mainWindow.BorderSizePixel = 0
+    mainWindow.ClipsDescendants = false
+    mainWindow.Parent = screenGui
+    Instance.new("UICorner", mainWindow).CornerRadius = UDim.new(0, 16)
 
-    -- ========== TOP HEADER BAR ==========
-    local headerBar = Instance.new("Frame")
-    headerBar.Name = "HeaderBar"
-    headerBar.Size = UDim2.new(1, 0, 0, 46)
-    headerBar.Position = UDim2.new(0, 0, 0, 0)
-    headerBar.BackgroundColor3 = Theme.CardBg
-    headerBar.BorderSizePixel = 0
-    headerBar.Parent = dragFrame
+    local mainStroke = Instance.new("UIStroke", mainWindow)
+    mainStroke.Color = Theme.StrokeDim
+    mainStroke.Thickness = 1.2
 
-    local headerCorner = Instance.new("UICorner", headerBar)
-    headerCorner.CornerRadius = UDim.new(0, 12)
+    -- ========== LEFT SIDEBAR ==========
+    local SIDEBAR_WIDTH = 175
+    local PADDING = 10
 
-    local headerStroke = Instance.new("UIStroke", headerBar)
-    headerStroke.Color = Theme.StrokeNormal
+    local sidebar = Instance.new("Frame")
+    sidebar.Name = "Sidebar"
+    sidebar.Size = UDim2.new(0, SIDEBAR_WIDTH, 1, -PADDING * 2)
+    sidebar.Position = UDim2.new(0, PADDING, 0, PADDING)
+    sidebar.BackgroundColor3 = Theme.PanelBg
+    sidebar.BorderSizePixel = 0
+    sidebar.Parent = mainWindow
+    Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 12)
+
+    local sidebarStroke = Instance.new("UIStroke", sidebar)
+    sidebarStroke.Color = Theme.StrokeDim
+    sidebarStroke.Thickness = 1
+
+    -- Brand Card (Top of Sidebar)
+    local brandCard = Instance.new("Frame")
+    brandCard.Name = "BrandCard"
+    brandCard.Size = UDim2.new(1, -16, 0, 46)
+    brandCard.Position = UDim2.new(0, 8, 0, 8)
+    brandCard.BackgroundColor3 = Theme.PanelHeader
+    brandCard.BorderSizePixel = 0
+    brandCard.Parent = sidebar
+    Instance.new("UICorner", brandCard).CornerRadius = UDim.new(0, 10)
+
+    local brandStroke = Instance.new("UIStroke", brandCard)
+    brandStroke.Color = Theme.StrokeDim
+    brandStroke.Thickness = 1
+
+    local brandLogo = Instance.new("TextLabel")
+    brandLogo.Size = UDim2.new(0, 24, 0, 24)
+    brandLogo.Position = UDim2.new(0, 10, 0.5, -12)
+    brandLogo.BackgroundTransparency = 1
+    brandLogo.Font = Enum.Font.GothamBold
+    brandLogo.Text = "⚡"
+    brandLogo.TextColor3 = Theme.AccentGlow
+    brandLogo.TextSize = 18
+    brandLogo.Parent = brandCard
+
+    local brandTitle = Instance.new("TextLabel")
+    brandTitle.Size = UDim2.new(1, -44, 0, 18)
+    brandTitle.Position = UDim2.new(0, 36, 0, 7)
+    brandTitle.BackgroundTransparency = 1
+    brandTitle.Font = Enum.Font.GothamBold
+    brandTitle.Text = "XCLIENT"
+    brandTitle.TextColor3 = Theme.TextPrimary
+    brandTitle.TextSize = 13
+    brandTitle.TextXAlignment = Enum.TextXAlignment.Left
+    brandTitle.Parent = brandCard
+
+    local brandSub = Instance.new("TextLabel")
+    brandSub.Size = UDim2.new(1, -44, 0, 14)
+    brandSub.Position = UDim2.new(0, 36, 0, 24)
+    brandSub.BackgroundTransparency = 1
+    brandSub.Font = Enum.Font.Gotham
+    brandSub.Text = "v2.0 • Modern"
+    brandSub.TextColor3 = Theme.AccentCyan
+    brandSub.TextSize = 10
+    brandSub.TextXAlignment = Enum.TextXAlignment.Left
+    brandSub.Parent = brandCard
+
+    -- Categories Buttons Container
+    local catContainer = Instance.new("Frame")
+    catContainer.Name = "CategoryList"
+    catContainer.Size = UDim2.new(1, -16, 1, -118)
+    catContainer.Position = UDim2.new(0, 8, 0, 62)
+    catContainer.BackgroundTransparency = 1
+    catContainer.Parent = sidebar
+
+    local catLayout = Instance.new("UIListLayout", catContainer)
+    catLayout.FillDirection = Enum.FillDirection.Vertical
+    catLayout.Padding = UDim.new(0, 4)
+    catLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    -- Profile Card (Bottom of Sidebar)
+    local profileCard = Instance.new("Frame")
+    profileCard.Name = "ProfileCard"
+    profileCard.Size = UDim2.new(1, -16, 0, 42)
+    profileCard.Position = UDim2.new(0, 8, 1, -50)
+    profileCard.BackgroundColor3 = Theme.PanelHeader
+    profileCard.BorderSizePixel = 0
+    profileCard.Parent = sidebar
+    Instance.new("UICorner", profileCard).CornerRadius = UDim.new(0, 10)
+
+    local profileStroke = Instance.new("UIStroke", profileCard)
+    profileStroke.Color = Theme.StrokeDim
+    profileStroke.Thickness = 1
+
+    local avatarImg = Instance.new("ImageLabel")
+    avatarImg.Name = "Avatar"
+    avatarImg.Size = UDim2.new(0, 28, 0, 28)
+    avatarImg.Position = UDim2.new(0, 7, 0.5, -14)
+    avatarImg.BackgroundColor3 = Color3.fromRGB(30, 35, 52)
+    avatarImg.BorderSizePixel = 0
+    pcall(function()
+        if LocalPlayer and LocalPlayer.UserId then
+            avatarImg.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(LocalPlayer.UserId) .. "&w=48&h=48"
+        end
+    end)
+    avatarImg.Parent = profileCard
+    Instance.new("UICorner", avatarImg).CornerRadius = UDim.new(1, 0)
+
+    local profileName = Instance.new("TextLabel")
+    profileName.Size = UDim2.new(1, -44, 0, 16)
+    profileName.Position = UDim2.new(0, 42, 0, 6)
+    profileName.BackgroundTransparency = 1
+    profileName.Font = Enum.Font.GothamBold
+    profileName.Text = (LocalPlayer and LocalPlayer.DisplayName) or "Player"
+    profileName.TextColor3 = Theme.TextPrimary
+    profileName.TextSize = 11
+    profileName.TextXAlignment = Enum.TextXAlignment.Left
+    profileName.TextTruncate = Enum.TextTruncate.AtEnd
+    profileName.Parent = profileCard
+
+    local profileStatus = Instance.new("TextLabel")
+    profileStatus.Size = UDim2.new(1, -44, 0, 14)
+    profileStatus.Position = UDim2.new(0, 42, 0, 22)
+    profileStatus.BackgroundTransparency = 1
+    profileStatus.Font = Enum.Font.Gotham
+    profileStatus.Text = "Активен"
+    profileStatus.TextColor3 = Theme.Success
+    profileStatus.TextSize = 10
+    profileStatus.TextXAlignment = Enum.TextXAlignment.Left
+    profileStatus.Parent = profileCard
+
+    -- ========== RIGHT WORKSPACE AREA ==========
+    local RIGHT_X = SIDEBAR_WIDTH + PADDING * 2
+    local RIGHT_WIDTH = WIN_WIDTH - RIGHT_X - PADDING
+
+    -- 1. Top Header Card
+    local HEADER_HEIGHT = 44
+    local headerCard = Instance.new("Frame")
+    headerCard.Name = "HeaderCard"
+    headerCard.Size = UDim2.new(0, RIGHT_WIDTH, 0, HEADER_HEIGHT)
+    headerCard.Position = UDim2.new(0, RIGHT_X, 0, PADDING)
+    headerCard.BackgroundColor3 = Theme.PanelBg
+    headerCard.BorderSizePixel = 0
+    headerCard.Parent = mainWindow
+    Instance.new("UICorner", headerCard).CornerRadius = UDim.new(0, 12)
+
+    local headerStroke = Instance.new("UIStroke", headerCard)
+    headerStroke.Color = Theme.StrokeDim
     headerStroke.Thickness = 1
 
-    -- Logo
-    local logoLabel = Instance.new("TextLabel")
-    logoLabel.Name = "Logo"
-    logoLabel.Size = UDim2.new(0, 130, 1, 0)
-    logoLabel.Position = UDim2.new(0, 16, 0, 0)
-    logoLabel.BackgroundTransparency = 1
-    logoLabel.Font = Enum.Font.GothamBold
-    logoLabel.Text = "⚡ XCLIENT"
-    logoLabel.TextColor3 = Theme.ItemActive
-    logoLabel.TextSize = 18
-    logoLabel.TextXAlignment = Enum.TextXAlignment.Left
-    logoLabel.Parent = headerBar
+    local categoryHeaderTitle = Instance.new("TextLabel")
+    categoryHeaderTitle.Name = "CategoryTitle"
+    categoryHeaderTitle.Size = UDim2.new(0, 160, 1, 0)
+    categoryHeaderTitle.Position = UDim2.new(0, 16, 0, 0)
+    categoryHeaderTitle.BackgroundTransparency = 1
+    categoryHeaderTitle.Font = Enum.Font.GothamBold
+    categoryHeaderTitle.Text = "Combat"
+    categoryHeaderTitle.TextColor3 = Theme.TextPrimary
+    categoryHeaderTitle.TextSize = 15
+    categoryHeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
+    categoryHeaderTitle.Parent = headerCard
 
-    -- Version Badge
-    local verBadge = Instance.new("Frame")
-    verBadge.Name = "VersionBadge"
-    verBadge.Size = UDim2.new(0, 50, 0, 20)
-    verBadge.Position = UDim2.new(0, 138, 0.5, -10)
-    verBadge.BackgroundColor3 = Color3.fromRGB(30, 33, 54)
-    verBadge.BorderSizePixel = 0
-    verBadge.Parent = headerBar
-    Instance.new("UICorner", verBadge).CornerRadius = UDim.new(0, 6)
-
-    local verText = Instance.new("TextLabel")
-    verText.Size = UDim2.new(1, 0, 1, 0)
-    verText.BackgroundTransparency = 1
-    verText.Font = Enum.Font.GothamBold
-    verText.Text = "v2.0"
-    verText.TextColor3 = Theme.ItemActiveDot
-    verText.TextSize = 11
-    verText.Parent = verBadge
-
-    -- Active Count Badge
-    activeModulesCountLabel = Instance.new("TextLabel")
-    activeModulesCountLabel.Name = "ActiveCount"
-    activeModulesCountLabel.Size = UDim2.new(0, 110, 1, 0)
-    activeModulesCountLabel.Position = UDim2.new(0, 200, 0, 0)
-    activeModulesCountLabel.BackgroundTransparency = 1
-    activeModulesCountLabel.Font = Enum.Font.Gotham
-    activeModulesCountLabel.Text = "Активно: 0"
-    activeModulesCountLabel.TextColor3 = Theme.TextSecondary
-    activeModulesCountLabel.TextSize = 12
-    activeModulesCountLabel.TextXAlignment = Enum.TextXAlignment.Left
-    activeModulesCountLabel.Parent = headerBar
-
-    -- Search Box Container
+    -- Search Box
     local searchContainer = Instance.new("Frame")
-    searchContainer.Name = "SearchContainer"
-    searchContainer.Size = UDim2.new(0, 260, 0, 30)
-    searchContainer.Position = UDim2.new(0.5, -130, 0.5, -15)
-    searchContainer.BackgroundColor3 = Color3.fromRGB(12, 13, 20)
+    searchContainer.Name = "SearchBox"
+    searchContainer.Size = UDim2.new(0, 200, 0, 28)
+    searchContainer.Position = UDim2.new(1, -196, 0.5, -14)
+    searchContainer.BackgroundColor3 = Theme.PanelHeader
     searchContainer.BorderSizePixel = 0
-    searchContainer.Parent = headerBar
+    searchContainer.Parent = headerCard
     Instance.new("UICorner", searchContainer).CornerRadius = UDim.new(0, 8)
 
     local searchStroke = Instance.new("UIStroke", searchContainer)
-    searchStroke.Color = Theme.StrokeNormal
+    searchStroke.Color = Theme.StrokeDim
     searchStroke.Thickness = 1
 
     local searchIcon = Instance.new("TextLabel")
-    searchIcon.Size = UDim2.new(0, 26, 1, 0)
+    searchIcon.Size = UDim2.new(0, 24, 1, 0)
     searchIcon.Position = UDim2.new(0, 6, 0, 0)
     searchIcon.BackgroundTransparency = 1
     searchIcon.Font = Enum.Font.Gotham
     searchIcon.Text = "🔍"
-    searchIcon.TextSize = 12
+    searchIcon.TextSize = 11
     searchIcon.TextColor3 = Theme.TextMuted
     searchIcon.Parent = searchContainer
 
-    local searchBox = Instance.new("TextBox")
-    searchBox.Size = UDim2.new(1, -38, 1, 0)
-    searchBox.Position = UDim2.new(0, 32, 0, 0)
-    searchBox.BackgroundTransparency = 1
-    searchBox.Font = Enum.Font.Gotham
-    searchBox.PlaceholderText = "Поиск по модулям..."
-    searchBox.PlaceholderColor3 = Theme.TextMuted
-    searchBox.Text = ""
-    searchBox.TextColor3 = Theme.TextPrimary
-    searchBox.TextSize = 12
-    searchBox.TextXAlignment = Enum.TextXAlignment.Left
-    searchBox.ClearTextOnFocus = false
-    searchBox.Parent = searchContainer
+    local searchInput = Instance.new("TextBox")
+    searchInput.Size = UDim2.new(1, -34, 1, 0)
+    searchInput.Position = UDim2.new(0, 28, 0, 0)
+    searchInput.BackgroundTransparency = 1
+    searchInput.Font = Enum.Font.Gotham
+    searchInput.PlaceholderText = "Поиск функций..."
+    searchInput.PlaceholderColor3 = Theme.TextMuted
+    searchInput.Text = ""
+    searchInput.TextColor3 = Theme.TextPrimary
+    searchInput.TextSize = 11
+    searchInput.TextXAlignment = Enum.TextXAlignment.Left
+    searchInput.ClearTextOnFocus = false
+    searchInput.Parent = searchContainer
 
-    -- Reload Button (Right side)
+    -- Reload & Close Buttons
     local reloadBtn = Instance.new("TextButton")
-    reloadBtn.Name = "ReloadBtn"
-    reloadBtn.Size = UDim2.new(0, 110, 0, 28)
-    reloadBtn.Position = UDim2.new(1, -156, 0.5, -14)
-    reloadBtn.BackgroundColor3 = Color3.fromRGB(24, 27, 44)
+    reloadBtn.Size = UDim2.new(0, 28, 0, 28)
+    reloadBtn.Position = UDim2.new(1, -66, 0.5, -14)
+    reloadBtn.BackgroundColor3 = Theme.PanelHeader
     reloadBtn.BorderSizePixel = 0
     reloadBtn.AutoButtonColor = false
     reloadBtn.Font = Enum.Font.GothamBold
-    reloadBtn.Text = "⟳ Обновить"
+    reloadBtn.Text = "⟳"
     reloadBtn.TextColor3 = Theme.TextSecondary
-    reloadBtn.TextSize = 11
-    reloadBtn.Parent = headerBar
+    reloadBtn.TextSize = 13
+    reloadBtn.Parent = headerCard
     Instance.new("UICorner", reloadBtn).CornerRadius = UDim.new(0, 8)
-
     local reloadStroke = Instance.new("UIStroke", reloadBtn)
-    reloadStroke.Color = Theme.StrokeNormal
+    reloadStroke.Color = Theme.StrokeDim
     reloadStroke.Thickness = 1
 
-    -- Close Button (Right side)
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Name = "CloseBtn"
     closeBtn.Size = UDim2.new(0, 28, 0, 28)
-    closeBtn.Position = UDim2.new(1, -38, 0.5, -14)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(24, 27, 44)
+    closeBtn.Position = UDim2.new(1, -34, 0.5, -14)
+    closeBtn.BackgroundColor3 = Theme.PanelHeader
     closeBtn.BorderSizePixel = 0
     closeBtn.AutoButtonColor = false
     closeBtn.Font = Enum.Font.GothamBold
     closeBtn.Text = "✕"
     closeBtn.TextColor3 = Theme.TextSecondary
-    closeBtn.TextSize = 13
-    closeBtn.Parent = headerBar
+    closeBtn.TextSize = 12
+    closeBtn.Parent = headerCard
     Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
+    local closeStroke = Instance.new("UIStroke", closeBtn)
+    closeStroke.Color = Theme.StrokeDim
+    closeStroke.Thickness = 1
 
-    -- ========== COLUMNS HOLDER ==========
-    local columnsHolder = Instance.new("Frame")
-    columnsHolder.Name = "ColumnsHolder"
-    columnsHolder.Size = UDim2.new(1, 0, 1, -56)
-    columnsHolder.Position = UDim2.new(0, 0, 0, 56)
-    columnsHolder.BackgroundTransparency = 1
-    columnsHolder.Parent = dragFrame
+    -- Adjust search box position with reload & close present
+    searchContainer.Position = UDim2.new(1, -274, 0.5, -14)
 
-    local columnsLayout = Instance.new("UIListLayout", columnsHolder)
-    columnsLayout.FillDirection = Enum.FillDirection.Horizontal
-    columnsLayout.Padding = UDim.new(0, 10)
-    columnsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    -- 2. Content Card (Modules List on Left + Inspector on Right)
+    local CONTENT_Y = PADDING + HEADER_HEIGHT + 8
+    local CONTENT_HEIGHT = WIN_HEIGHT - CONTENT_Y - PADDING
 
-    -- ========== SETTINGS DRAWER (SIDE PANEL) ==========
-    local settingsPanel = Instance.new("Frame")
-    settingsPanel.Name = "SettingsPanel"
-    settingsPanel.Size = UDim2.new(0, 290, 1, -56)
-    settingsPanel.Position = UDim2.new(1, 14, 0, 56)
-    settingsPanel.BackgroundColor3 = Theme.CardBg
-    settingsPanel.BorderSizePixel = 0
-    settingsPanel.Visible = false
-    settingsPanel.Parent = dragFrame
-    Instance.new("UICorner", settingsPanel).CornerRadius = UDim.new(0, 12)
+    local contentCard = Instance.new("Frame")
+    contentCard.Name = "ContentCard"
+    contentCard.Size = UDim2.new(0, RIGHT_WIDTH, 0, CONTENT_HEIGHT)
+    contentCard.Position = UDim2.new(0, RIGHT_X, 0, CONTENT_Y)
+    contentCard.BackgroundColor3 = Theme.PanelBg
+    contentCard.BorderSizePixel = 0
+    contentCard.Parent = mainWindow
+    Instance.new("UICorner", contentCard).CornerRadius = UDim.new(0, 12)
 
-    local settingsStroke = Instance.new("UIStroke", settingsPanel)
-    settingsStroke.Color = Theme.StrokeNormal
-    settingsStroke.Thickness = 1
+    local contentStroke = Instance.new("UIStroke", contentCard)
+    contentStroke.Color = Theme.StrokeDim
+    contentStroke.Thickness = 1
 
-    local settingsHeader = Instance.new("Frame")
-    settingsHeader.Size = UDim2.new(1, 0, 0, 42)
-    settingsHeader.BackgroundColor3 = Theme.CardHeader
-    settingsHeader.BorderSizePixel = 0
-    settingsHeader.Parent = settingsPanel
-    Instance.new("UICorner", settingsHeader).CornerRadius = UDim.new(0, 12)
+    -- Left Pane: Module List
+    local MODULE_LIST_WIDTH = 215
 
-    local settingsTitle = Instance.new("TextLabel")
-    settingsTitle.Size = UDim2.new(1, -70, 1, 0)
-    settingsTitle.Position = UDim2.new(0, 14, 0, 0)
-    settingsTitle.BackgroundTransparency = 1
-    settingsTitle.Font = Enum.Font.GothamBold
-    settingsTitle.Text = "Настройки"
-    settingsTitle.TextColor3 = Theme.TextPrimary
-    settingsTitle.TextSize = 14
-    settingsTitle.TextXAlignment = Enum.TextXAlignment.Left
-    settingsTitle.Parent = settingsHeader
+    local moduleListFrame = Instance.new("ScrollingFrame")
+    moduleListFrame.Name = "ModuleList"
+    moduleListFrame.Size = UDim2.new(0, MODULE_LIST_WIDTH, 1, -16)
+    moduleListFrame.Position = UDim2.new(0, 10, 0, 8)
+    moduleListFrame.BackgroundTransparency = 1
+    moduleListFrame.BorderSizePixel = 0
+    moduleListFrame.ScrollBarThickness = 2
+    moduleListFrame.ScrollBarImageColor3 = Theme.StrokeDim
+    moduleListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    moduleListFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    moduleListFrame.Parent = contentCard
 
-    local settingsCloseBtn = Instance.new("TextButton")
-    settingsCloseBtn.Size = UDim2.new(0, 26, 0, 26)
-    settingsCloseBtn.Position = UDim2.new(1, -34, 0.5, -13)
-    settingsCloseBtn.BackgroundColor3 = Color3.fromRGB(30, 33, 50)
-    settingsCloseBtn.BorderSizePixel = 0
-    settingsCloseBtn.AutoButtonColor = false
-    settingsCloseBtn.Font = Enum.Font.GothamBold
-    settingsCloseBtn.Text = "✕"
-    settingsCloseBtn.TextColor3 = Theme.TextSecondary
-    settingsCloseBtn.TextSize = 12
-    settingsCloseBtn.Parent = settingsHeader
-    Instance.new("UICorner", settingsCloseBtn).CornerRadius = UDim.new(0, 6)
+    local moduleListLayout = Instance.new("UIListLayout", moduleListFrame)
+    moduleListLayout.Padding = UDim.new(0, 5)
+    moduleListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-    local settingsScroll = Instance.new("ScrollingFrame")
-    settingsScroll.Name = "SettingsScroll"
-    settingsScroll.Size = UDim2.new(1, -16, 1, -54)
-    settingsScroll.Position = UDim2.new(0, 8, 0, 48)
-    settingsScroll.BackgroundTransparency = 1
-    settingsScroll.BorderSizePixel = 0
-    settingsScroll.ScrollBarThickness = 3
-    settingsScroll.ScrollBarImageColor3 = Theme.StrokeAccent
-    settingsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    settingsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    settingsScroll.Parent = settingsPanel
+    -- Vertical Divider
+    local divider = Instance.new("Frame")
+    divider.Name = "Divider"
+    divider.Size = UDim2.new(0, 1, 1, -16)
+    divider.Position = UDim2.new(0, MODULE_LIST_WIDTH + 18, 0, 8)
+    divider.BackgroundColor3 = Theme.StrokeDim
+    divider.BorderSizePixel = 0
+    divider.Parent = contentCard
 
-    local settingsLayout = Instance.new("UIListLayout", settingsScroll)
-    settingsLayout.Padding = UDim.new(0, 8)
-    settingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    -- Right Pane: Inspector / Settings Panel
+    local INSPECTOR_X = MODULE_LIST_WIDTH + 26
+    local INSPECTOR_WIDTH = RIGHT_WIDTH - INSPECTOR_X - 10
+
+    local inspectorFrame = Instance.new("Frame")
+    inspectorFrame.Name = "Inspector"
+    inspectorFrame.Size = UDim2.new(0, INSPECTOR_WIDTH, 1, -16)
+    inspectorFrame.Position = UDim2.new(0, INSPECTOR_X, 0, 8)
+    inspectorFrame.BackgroundTransparency = 1
+    inspectorFrame.Parent = contentCard
+
+    local inspectorScroll = Instance.new("ScrollingFrame")
+    inspectorScroll.Name = "InspectorScroll"
+    inspectorScroll.Size = UDim2.new(1, 0, 1, 0)
+    inspectorScroll.BackgroundTransparency = 1
+    inspectorScroll.BorderSizePixel = 0
+    inspectorScroll.ScrollBarThickness = 3
+    inspectorScroll.ScrollBarImageColor3 = Theme.Accent
+    inspectorScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    inspectorScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    inspectorScroll.Parent = inspectorFrame
+
+    local inspectorLayout = Instance.new("UIListLayout", inspectorScroll)
+    inspectorLayout.Padding = UDim.new(0, 8)
+    inspectorLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
     -- ========== HELPERS ==========
-    local function tweenColor(inst, targetColor, dur)
-        TweenService:Create(
-            inst,
-            TweenInfo.new(dur or 0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            { BackgroundColor3 = targetColor }
-        ):Play()
-    end
-
     local function notify(text, dur, color)
         if Notifications and Notifications.Show then
             Notifications:Show(text, dur, color)
         end
     end
 
-    local function updateActiveCounter()
-        if not activeModulesCountLabel then return end
-        local count = 0
-        for _, mod in ipairs(ModuleManager.Modules) do
-            if mod.Enabled then count = count + 1 end
-        end
-        activeModulesCountLabel.Text = "Активно: " .. count
+    local function tween(inst, props, dur)
+        TweenService:Create(
+            inst,
+            TweenInfo.new(dur or 0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            props
+        ):Play()
     end
 
-    -- ========== SETTINGS PANEL RENDERING ==========
-    local function clearSettingsPanel()
-        for _, child in ipairs(settingsScroll:GetChildren()) do
+    -- ========== INSPECTOR RENDERING ==========
+    local function renderInspector(mod)
+        for _, child in ipairs(inspectorScroll:GetChildren()) do
             if child:IsA("GuiObject") then child:Destroy() end
         end
-    end
 
-    local function renderSettingsPanel(mod)
-        clearSettingsPanel()
         if not mod then
-            settingsPanel.Visible = false
-            settingsOpen = false
-            settingsModName = nil
-            for _, b in ipairs(allButtons) do
-                if b.updateColors then b.updateColors() end
-            end
+            -- Empty state
+            local empty = Instance.new("Frame")
+            empty.Size = UDim2.new(1, 0, 1, 0)
+            empty.BackgroundTransparency = 1
+            empty.Parent = inspectorScroll
+
+            local icon = Instance.new("TextLabel")
+            icon.Size = UDim2.new(1, 0, 0, 36)
+            icon.Position = UDim2.new(0, 0, 0.35, 0)
+            icon.BackgroundTransparency = 1
+            icon.Font = Enum.Font.Gotham
+            icon.Text = "⚡"
+            icon.TextColor3 = Theme.TextMuted
+            icon.TextSize = 28
+            icon.Parent = empty
+
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(1, 0, 0, 20)
+            lbl.Position = UDim2.new(0, 0, 0.35, 38)
+            lbl.BackgroundTransparency = 1
+            lbl.Font = Enum.Font.GothamMedium
+            lbl.Text = "Выберите модуль для настройки"
+            lbl.TextColor3 = Theme.TextMuted
+            lbl.TextSize = 12
+            lbl.Parent = empty
             return
         end
 
-        settingsTitle.Text = mod.Name or "Настройки"
-        settingsModName = mod.Name
-        settingsOpen = true
-        settingsPanel.Visible = true
+        -- Header Card in Inspector
+        local headerCardMod = Instance.new("Frame")
+        headerCardMod.Name = "ModHeader"
+        headerCardMod.Size = UDim2.new(1, -4, 0, 52)
+        headerCardMod.BackgroundColor3 = Theme.CardBg
+        headerCardMod.BorderSizePixel = 0
+        headerCardMod.LayoutOrder = 1
+        headerCardMod.Parent = inspectorScroll
+        Instance.new("UICorner", headerCardMod).CornerRadius = UDim.new(0, 10)
 
-        -- Quick Toggle Switch in Settings
-        local toggleRow = Instance.new("Frame")
-        toggleRow.Size = UDim2.new(1, 0, 0, 36)
-        toggleRow.BackgroundColor3 = Color3.fromRGB(24, 27, 44)
-        toggleRow.BorderSizePixel = 0
-        toggleRow.LayoutOrder = 1
-        toggleRow.Parent = settingsScroll
-        Instance.new("UICorner", toggleRow).CornerRadius = UDim.new(0, 8)
+        local hmStroke = Instance.new("UIStroke", headerCardMod)
+        hmStroke.Color = Theme.StrokeDim
+        hmStroke.Thickness = 1
 
-        local toggleLabel = Instance.new("TextLabel")
-        toggleLabel.Size = UDim2.new(1, -70, 1, 0)
-        toggleLabel.Position = UDim2.new(0, 12, 0, 0)
-        toggleLabel.BackgroundTransparency = 1
-        toggleLabel.Font = Enum.Font.GothamBold
-        toggleLabel.Text = "Включить модуль"
-        toggleLabel.TextColor3 = Theme.TextPrimary
-        toggleLabel.TextSize = 12
-        toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-        toggleLabel.Parent = toggleRow
+        local modNameLbl = Instance.new("TextLabel")
+        modNameLbl.Size = UDim2.new(0.65, 0, 0, 20)
+        modNameLbl.Position = UDim2.new(0, 12, 0, 8)
+        modNameLbl.BackgroundTransparency = 1
+        modNameLbl.Font = Enum.Font.GothamBold
+        modNameLbl.Text = mod.Name or "Unknown"
+        modNameLbl.TextColor3 = Theme.TextPrimary
+        modNameLbl.TextSize = 14
+        modNameLbl.TextXAlignment = Enum.TextXAlignment.Left
+        modNameLbl.Parent = headerCardMod
 
-        local toggleSwitch = Instance.new("TextButton")
-        toggleSwitch.Size = UDim2.new(0, 44, 0, 22)
-        toggleSwitch.Position = UDim2.new(1, -54, 0.5, -11)
-        toggleSwitch.BackgroundColor3 = mod.Enabled and Theme.ItemActive or Color3.fromRGB(36, 40, 62)
-        toggleSwitch.BorderSizePixel = 0
-        toggleSwitch.AutoButtonColor = false
-        toggleSwitch.Text = ""
-        toggleSwitch.Parent = toggleRow
-        Instance.new("UICorner", toggleSwitch).CornerRadius = UDim.new(1, 0)
+        local catTag = Instance.new("TextLabel")
+        catTag.Size = UDim2.new(0.65, 0, 0, 14)
+        catTag.Position = UDim2.new(0, 12, 0, 30)
+        catTag.BackgroundTransparency = 1
+        catTag.Font = Enum.Font.Gotham
+        catTag.Text = "Категория: " .. (mod.Category or "Misc")
+        catTag.TextColor3 = Theme.AccentGlow
+        catTag.TextSize = 10
+        catTag.TextXAlignment = Enum.TextXAlignment.Left
+        catTag.Parent = headerCardMod
 
-        local toggleThumb = Instance.new("Frame")
-        toggleThumb.Size = UDim2.new(0, 16, 0, 16)
-        toggleThumb.Position = mod.Enabled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
-        toggleThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        toggleThumb.BorderSizePixel = 0
-        toggleThumb.Parent = toggleSwitch
-        Instance.new("UICorner", toggleThumb).CornerRadius = UDim.new(1, 0)
+        -- Master Switch in Inspector Header
+        local masterSwitch = Instance.new("TextButton")
+        masterSwitch.Size = UDim2.new(0, 44, 0, 22)
+        masterSwitch.Position = UDim2.new(1, -54, 0.5, -11)
+        masterSwitch.BackgroundColor3 = mod.Enabled and Theme.SwitchOn or Theme.SwitchOff
+        masterSwitch.BorderSizePixel = 0
+        masterSwitch.AutoButtonColor = false
+        masterSwitch.Text = ""
+        masterSwitch.Parent = headerCardMod
+        Instance.new("UICorner", masterSwitch).CornerRadius = UDim.new(1, 0)
 
-        toggleSwitch.MouseButton1Click:Connect(function()
+        local masterThumb = Instance.new("Frame")
+        masterThumb.Size = UDim2.new(0, 16, 0, 16)
+        masterThumb.Position = mod.Enabled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+        masterThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        masterThumb.BorderSizePixel = 0
+        masterThumb.Parent = masterSwitch
+        Instance.new("UICorner", masterThumb).CornerRadius = UDim.new(1, 0)
+
+        masterSwitch.MouseButton1Click:Connect(function()
             ModuleManager:SetEnabled(mod, not mod.Enabled)
-            local enabled = mod.Enabled
-            TweenService:Create(toggleSwitch, TweenInfo.new(0.18), {
-                BackgroundColor3 = enabled and Theme.ItemActive or Color3.fromRGB(36, 40, 62)
-            }):Play()
-            TweenService:Create(toggleThumb, TweenInfo.new(0.18), {
-                Position = enabled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
-            }):Play()
-            for _, b in ipairs(allButtons) do
-                if b.updateColors then b.updateColors() end
+            local state = mod.Enabled
+            tween(masterSwitch, { BackgroundColor3 = state and Theme.SwitchOn or Theme.SwitchOff })
+            tween(masterThumb, { Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8) })
+
+            -- Refresh list item switch
+            for _, item in ipairs(moduleCardItems) do
+                if item.mod == mod and item.updateState then
+                    item.updateState()
+                end
             end
-            updateActiveCounter()
+
+            if state then
+                notify(mod.Name .. " включён", 2, Theme.Success)
+            else
+                notify(mod.Name .. " выключен", 2, Theme.Danger)
+            end
         end)
 
-        -- Keybind Assignment Button
+        -- Keybind Row
         local kbRow = Instance.new("Frame")
-        kbRow.Size = UDim2.new(1, 0, 0, 36)
-        kbRow.BackgroundColor3 = Color3.fromRGB(24, 27, 44)
+        kbRow.Size = UDim2.new(1, -4, 0, 36)
+        kbRow.BackgroundColor3 = Theme.CardBg
         kbRow.BorderSizePixel = 0
         kbRow.LayoutOrder = 2
-        kbRow.Parent = settingsScroll
+        kbRow.Parent = inspectorScroll
         Instance.new("UICorner", kbRow).CornerRadius = UDim.new(0, 8)
 
-        local kbTitle = Instance.new("TextLabel")
-        kbTitle.Size = UDim2.new(0.45, 0, 1, 0)
-        kbTitle.Position = UDim2.new(0, 12, 0, 0)
-        kbTitle.BackgroundTransparency = 1
-        kbTitle.Font = Enum.Font.Gotham
-        kbTitle.Text = "Горячая клавиша:"
-        kbTitle.TextColor3 = Theme.TextSecondary
-        kbTitle.TextSize = 11
-        kbTitle.TextXAlignment = Enum.TextXAlignment.Left
-        kbTitle.Parent = kbRow
+        local kbStroke = Instance.new("UIStroke", kbRow)
+        kbStroke.Color = Theme.StrokeDim
+        kbStroke.Thickness = 1
+
+        local kbLabel = Instance.new("TextLabel")
+        kbLabel.Size = UDim2.new(0.5, 0, 1, 0)
+        kbLabel.Position = UDim2.new(0, 12, 0, 0)
+        kbLabel.BackgroundTransparency = 1
+        kbLabel.Font = Enum.Font.GothamMedium
+        kbLabel.Text = "Горячая клавиша"
+        kbLabel.TextColor3 = Theme.TextSecondary
+        kbLabel.TextSize = 11
+        kbLabel.TextXAlignment = Enum.TextXAlignment.Left
+        kbLabel.Parent = kbRow
 
         local kbBtn = Instance.new("TextButton")
-        kbBtn.Size = UDim2.new(0.48, 0, 0, 24)
-        kbBtn.Position = UDim2.new(0.5, 0, 0.5, -12)
-        kbBtn.BackgroundColor3 = Color3.fromRGB(32, 35, 56)
+        kbBtn.Size = UDim2.new(0.42, 0, 0, 24)
+        kbBtn.Position = UDim2.new(0.56, 0, 0.5, -12)
+        kbBtn.BackgroundColor3 = Theme.PanelHeader
         kbBtn.BorderSizePixel = 0
         kbBtn.AutoButtonColor = false
         kbBtn.Font = Enum.Font.GothamBold
         kbBtn.TextSize = 11
-        kbBtn.TextColor3 = Theme.ItemActiveDot
+        kbBtn.TextColor3 = Theme.AccentCyan
         kbBtn.Text = ModuleManager.Keybinds[mod.Name] and ("[" .. ModuleManager.Keybinds[mod.Name] .. "]") or "[ Нет ]"
         kbBtn.Parent = kbRow
         Instance.new("UICorner", kbBtn).CornerRadius = UDim.new(0, 6)
+
+        local kbBtnStroke = Instance.new("UIStroke", kbBtn)
+        kbBtnStroke.Color = Theme.StrokeDim
+        kbBtnStroke.Thickness = 1
 
         kbBtn.MouseButton1Click:Connect(function()
             if keybindListening then return end
             keybindListening = true
             kbBtn.Text = "[ Нажмите... ]"
-            kbBtn.TextColor3 = Theme.AccentGrad
+            kbBtn.TextColor3 = Theme.AccentGlow
 
             keybindCallback = function(input)
                 keybindListening = false
@@ -433,8 +568,8 @@ function Gui.Init(ModuleManager, Notifications)
                         ModuleManager.Keybinds[mod.Name] = nil
                         kbBtn.Text = "[ Нет ]"
                         kbBtn.TextColor3 = Theme.TextSecondary
-                        for _, b in ipairs(allButtons) do
-                            if b.mod == mod and b.kbLabel then b.kbLabel.Text = "" end
+                        for _, item in ipairs(moduleCardItems) do
+                            if item.mod == mod and item.kbTag then item.kbTag.Text = "" end
                         end
                         return
                     else
@@ -449,17 +584,17 @@ function Gui.Init(ModuleManager, Notifications)
                 if keyName then
                     ModuleManager.Keybinds[mod.Name] = keyName
                     kbBtn.Text = "[" .. keyName .. "]"
-                    kbBtn.TextColor3 = Theme.ItemActiveDot
-                    for _, b in ipairs(allButtons) do
-                        if b.mod == mod and b.kbLabel then
-                            b.kbLabel.Text = "[" .. keyName:sub(1, 5) .. "]"
+                    kbBtn.TextColor3 = Theme.AccentCyan
+                    for _, item in ipairs(moduleCardItems) do
+                        if item.mod == mod and item.kbTag then
+                            item.kbTag.Text = "[" .. keyName:sub(1, 4) .. "]"
                         end
                     end
                 end
             end
         end)
 
-        -- Dynamic Settings Definitions
+        -- Settings definitions rendering
         if mod.SettingsDefinitions and #mod.SettingsDefinitions > 0 then
             local orderCounter = 3
 
@@ -482,18 +617,22 @@ function Gui.Init(ModuleManager, Notifications)
                     end
 
                     local card = Instance.new("Frame")
-                    card.Size = UDim2.new(1, 0, 0, 48)
-                    card.BackgroundColor3 = Color3.fromRGB(24, 27, 44)
+                    card.Size = UDim2.new(1, -4, 0, 50)
+                    card.BackgroundColor3 = Theme.CardBg
                     card.BorderSizePixel = 0
                     card.LayoutOrder = orderCounter
-                    card.Parent = settingsScroll
+                    card.Parent = inspectorScroll
                     Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+
+                    local sStroke = Instance.new("UIStroke", card)
+                    sStroke.Color = Theme.StrokeDim
+                    sStroke.Thickness = 1
 
                     local lbl = Instance.new("TextLabel")
                     lbl.Size = UDim2.new(0.65, 0, 0, 20)
-                    lbl.Position = UDim2.new(0, 10, 0, 4)
+                    lbl.Position = UDim2.new(0, 12, 0, 5)
                     lbl.BackgroundTransparency = 1
-                    lbl.Font = Enum.Font.Gotham
+                    lbl.Font = Enum.Font.GothamMedium
                     lbl.Text = sName
                     lbl.TextColor3 = Theme.TextSecondary
                     lbl.TextSize = 11
@@ -502,19 +641,19 @@ function Gui.Init(ModuleManager, Notifications)
 
                     local valLbl = Instance.new("TextLabel")
                     valLbl.Size = UDim2.new(0.3, 0, 0, 20)
-                    valLbl.Position = UDim2.new(0.7, -10, 0, 4)
+                    valLbl.Position = UDim2.new(0.7, -12, 0, 5)
                     valLbl.BackgroundTransparency = 1
                     valLbl.Font = Enum.Font.GothamBold
                     valLbl.Text = tostring(currentVal) .. sSuffix
-                    valLbl.TextColor3 = Theme.ItemActiveDot
+                    valLbl.TextColor3 = Theme.AccentGlow
                     valLbl.TextSize = 11
                     valLbl.TextXAlignment = Enum.TextXAlignment.Right
                     valLbl.Parent = card
 
                     local barBg = Instance.new("Frame")
-                    barBg.Size = UDim2.new(1, -20, 0, 8)
-                    barBg.Position = UDim2.new(0, 10, 0, 28)
-                    barBg.BackgroundColor3 = Color3.fromRGB(36, 40, 62)
+                    barBg.Size = UDim2.new(1, -24, 0, 8)
+                    barBg.Position = UDim2.new(0, 12, 0, 30)
+                    barBg.BackgroundColor3 = Color3.fromRGB(36, 41, 60)
                     barBg.BorderSizePixel = 0
                     barBg.Parent = card
                     Instance.new("UICorner", barBg).CornerRadius = UDim.new(1, 0)
@@ -522,7 +661,7 @@ function Gui.Init(ModuleManager, Notifications)
                     local barFill = Instance.new("Frame")
                     local pct = math.clamp((currentVal - sMin) / (sMax - sMin), 0, 1)
                     barFill.Size = UDim2.new(pct, 0, 1, 0)
-                    barFill.BackgroundColor3 = Theme.ItemActive
+                    barFill.BackgroundColor3 = Theme.Accent
                     barFill.BorderSizePixel = 0
                     barFill.Parent = barBg
                     Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
@@ -578,18 +717,22 @@ function Gui.Init(ModuleManager, Notifications)
                     end
 
                     local row = Instance.new("Frame")
-                    row.Size = UDim2.new(1, 0, 0, 36)
-                    row.BackgroundColor3 = Color3.fromRGB(24, 27, 44)
+                    row.Size = UDim2.new(1, -4, 0, 36)
+                    row.BackgroundColor3 = Theme.CardBg
                     row.BorderSizePixel = 0
                     row.LayoutOrder = orderCounter
-                    row.Parent = settingsScroll
+                    row.Parent = inspectorScroll
                     Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+
+                    local tStroke = Instance.new("UIStroke", row)
+                    tStroke.Color = Theme.StrokeDim
+                    tStroke.Thickness = 1
 
                     local lbl = Instance.new("TextLabel")
                     lbl.Size = UDim2.new(1, -60, 1, 0)
                     lbl.Position = UDim2.new(0, 12, 0, 0)
                     lbl.BackgroundTransparency = 1
-                    lbl.Font = Enum.Font.Gotham
+                    lbl.Font = Enum.Font.GothamMedium
                     lbl.Text = sName
                     lbl.TextColor3 = Theme.TextSecondary
                     lbl.TextSize = 11
@@ -599,7 +742,7 @@ function Gui.Init(ModuleManager, Notifications)
                     local sw = Instance.new("TextButton")
                     sw.Size = UDim2.new(0, 40, 0, 20)
                     sw.Position = UDim2.new(1, -50, 0.5, -10)
-                    sw.BackgroundColor3 = currentVal and Theme.ItemActive or Color3.fromRGB(36, 40, 62)
+                    sw.BackgroundColor3 = currentVal and Theme.SwitchOn or Theme.SwitchOff
                     sw.BorderSizePixel = 0
                     sw.AutoButtonColor = false
                     sw.Text = ""
@@ -618,12 +761,8 @@ function Gui.Init(ModuleManager, Notifications)
                         currentVal = not currentVal
                         if not mod.__settings__ then mod.__settings__ = {} end
                         mod.__settings__[sKey] = currentVal
-                        TweenService:Create(sw, TweenInfo.new(0.15), {
-                            BackgroundColor3 = currentVal and Theme.ItemActive or Color3.fromRGB(36, 40, 62)
-                        }):Play()
-                        TweenService:Create(th, TweenInfo.new(0.15), {
-                            Position = currentVal and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
-                        }):Play()
+                        tween(sw, { BackgroundColor3 = currentVal and Theme.SwitchOn or Theme.SwitchOff })
+                        tween(th, { Position = currentVal and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7) })
                     end)
 
                 elseif sType == "Dropdown" then
@@ -634,18 +773,22 @@ function Gui.Init(ModuleManager, Notifications)
                     end
 
                     local row = Instance.new("Frame")
-                    row.Size = UDim2.new(1, 0, 0, 34)
-                    row.BackgroundColor3 = Color3.fromRGB(24, 27, 44)
+                    row.Size = UDim2.new(1, -4, 0, 36)
+                    row.BackgroundColor3 = Theme.CardBg
                     row.BorderSizePixel = 0
                     row.LayoutOrder = orderCounter
-                    row.Parent = settingsScroll
+                    row.Parent = inspectorScroll
                     Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+
+                    local dStroke = Instance.new("UIStroke", row)
+                    dStroke.Color = Theme.StrokeDim
+                    dStroke.Thickness = 1
 
                     local lbl = Instance.new("TextLabel")
                     lbl.Size = UDim2.new(0.5, 0, 1, 0)
                     lbl.Position = UDim2.new(0, 12, 0, 0)
                     lbl.BackgroundTransparency = 1
-                    lbl.Font = Enum.Font.Gotham
+                    lbl.Font = Enum.Font.GothamMedium
                     lbl.Text = sName
                     lbl.TextColor3 = Theme.TextSecondary
                     lbl.TextSize = 11
@@ -654,8 +797,8 @@ function Gui.Init(ModuleManager, Notifications)
 
                     local dropBtn = Instance.new("TextButton")
                     dropBtn.Size = UDim2.new(0.44, 0, 0, 24)
-                    dropBtn.Position = UDim2.new(0.52, 0, 0.5, -12)
-                    dropBtn.BackgroundColor3 = Color3.fromRGB(32, 35, 56)
+                    dropBtn.Position = UDim2.new(0.54, 0, 0.5, -12)
+                    dropBtn.BackgroundColor3 = Theme.PanelHeader
                     dropBtn.BorderSizePixel = 0
                     dropBtn.AutoButtonColor = false
                     dropBtn.Font = Enum.Font.GothamBold
@@ -680,175 +823,153 @@ function Gui.Init(ModuleManager, Notifications)
                     end)
                 end
             end
+        else
+            -- No parameters row
+            local emptyRow = Instance.new("Frame")
+            emptyRow.Size = UDim2.new(1, -4, 0, 50)
+            emptyRow.BackgroundColor3 = Theme.CardBg
+            emptyRow.BorderSizePixel = 0
+            emptyRow.LayoutOrder = 3
+            emptyRow.Parent = inspectorScroll
+            Instance.new("UICorner", emptyRow).CornerRadius = UDim.new(0, 8)
+
+            local noSettingsLbl = Instance.new("TextLabel")
+            noSettingsLbl.Size = UDim2.new(1, 0, 1, 0)
+            noSettingsLbl.BackgroundTransparency = 1
+            noSettingsLbl.Font = Enum.Font.Gotham
+            noSettingsLbl.Text = "У данной функции нет дополнительных параметров"
+            noSettingsLbl.TextColor3 = Theme.TextMuted
+            noSettingsLbl.TextSize = 11
+            noSettingsLbl.Parent = emptyRow
         end
     end
 
-    settingsCloseBtn.MouseButton1Click:Connect(function()
-        renderSettingsPanel(nil)
-    end)
+    -- ========== MODULE LIST RENDERING ==========
+    local function renderModuleList()
+        for _, child in ipairs(moduleListFrame:GetChildren()) do
+            if child:IsA("GuiObject") then child:Destroy() end
+        end
+        moduleCardItems = {}
 
-    -- ========== CATEGORY COLUMN BUILDER ==========
-    local function createCategoryColumn(categoryName, modules, order)
-        local colFrame = Instance.new("Frame")
-        colFrame.Name = "Col_" .. categoryName
-        colFrame.Size = UDim2.new(0.2, -8, 1, 0)
-        colFrame.BackgroundColor3 = Theme.CardBg
-        colFrame.BorderSizePixel = 0
-        colFrame.LayoutOrder = order
-        colFrame.Parent = columnsHolder
-        Instance.new("UICorner", colFrame).CornerRadius = UDim.new(0, 12)
+        local listToDisplay = {}
+        local q = searchQuery:lower()
 
-        local colStroke = Instance.new("UIStroke", colFrame)
-        colStroke.Color = Theme.StrokeNormal
-        colStroke.Thickness = 1
+        for _, mod in ipairs(ModuleManager.Modules) do
+            local matchesCat = (selectedCategory == "ALL") or (mod.Category == selectedCategory)
+            local matchesSearch = (q == "") or (string.find((mod.Name or ""):lower(), q, 1, true) ~= nil)
+            if matchesCat and matchesSearch then
+                table.insert(listToDisplay, mod)
+            end
+        end
 
-        -- Header Accent Strip
-        local accentColor = CategoryColors[categoryName] or Theme.ItemActive
-        local accentStrip = Instance.new("Frame")
-        accentStrip.Size = UDim2.new(1, -24, 0, 3)
-        accentStrip.Position = UDim2.new(0, 12, 0, 1)
-        accentStrip.BackgroundColor3 = accentColor
-        accentStrip.BorderSizePixel = 0
-        accentStrip.Parent = colFrame
-        Instance.new("UICorner", accentStrip).CornerRadius = UDim.new(1, 0)
+        if #listToDisplay == 0 then
+            local emptyCard = Instance.new("Frame")
+            emptyCard.Size = UDim2.new(1, 0, 0, 50)
+            emptyCard.BackgroundTransparency = 1
+            emptyCard.Parent = moduleListFrame
 
-        -- Title Bar
-        local titleBar = Instance.new("Frame")
-        titleBar.Name = "TitleBar"
-        titleBar.Size = UDim2.new(1, 0, 0, 38)
-        titleBar.Position = UDim2.new(0, 0, 0, 4)
-        titleBar.BackgroundTransparency = 1
-        titleBar.Parent = colFrame
+            local emptyLbl = Instance.new("TextLabel")
+            emptyLbl.Size = UDim2.new(1, 0, 1, 0)
+            emptyLbl.BackgroundTransparency = 1
+            emptyLbl.Font = Enum.Font.Gotham
+            emptyLbl.Text = "Ничего не найдено"
+            emptyLbl.TextColor3 = Theme.TextMuted
+            emptyLbl.TextSize = 11
+            emptyLbl.Parent = emptyCard
+            return
+        end
 
-        local catIcon = CategoryIcons[categoryName] or "•"
-        local title = Instance.new("TextLabel")
-        title.Size = UDim2.new(1, -16, 1, 0)
-        title.Position = UDim2.new(0, 12, 0, 0)
-        title.BackgroundTransparency = 1
-        title.Font = Enum.Font.GothamBold
-        title.Text = catIcon .. "  " .. categoryName
-        title.TextColor3 = Theme.TextPrimary
-        title.TextSize = 13
-        title.TextXAlignment = Enum.TextXAlignment.Left
-        title.Parent = titleBar
+        -- If current selected module is not in list, auto-select first
+        local hasCurrent = false
+        for _, m in ipairs(listToDisplay) do
+            if m == selectedModule then hasCurrent = true break end
+        end
+        if not hasCurrent and #listToDisplay > 0 then
+            selectedModule = listToDisplay[1]
+        end
+        renderInspector(selectedModule)
 
-        -- Scrollable Module List
-        local scrollHolder = Instance.new("ScrollingFrame")
-        scrollHolder.Name = "ScrollHolder"
-        scrollHolder.Size = UDim2.new(1, -10, 1, -48)
-        scrollHolder.Position = UDim2.new(0, 5, 0, 44)
-        scrollHolder.BackgroundTransparency = 1
-        scrollHolder.BorderSizePixel = 0
-        scrollHolder.ScrollBarThickness = 2
-        scrollHolder.ScrollBarImageColor3 = Theme.StrokeNormal
-        scrollHolder.CanvasSize = UDim2.new(0, 0, 0, 0)
-        scrollHolder.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        scrollHolder.Parent = colFrame
-
-        local list = Instance.new("UIListLayout", scrollHolder)
-        list.FillDirection = Enum.FillDirection.Vertical
-        list.Padding = UDim.new(0, 5)
-        list.SortOrder = Enum.SortOrder.LayoutOrder
-
-        for _, mod in ipairs(modules) do
+        for _, mod in ipairs(listToDisplay) do
             local card = Instance.new("Frame")
             card.Name = mod.Name
-            card.Size = UDim2.new(1, -4, 0, 34)
-            card.BackgroundColor3 = Theme.ItemBg
+            card.Size = UDim2.new(1, -6, 0, 36)
+            card.BackgroundColor3 = (selectedModule == mod) and Theme.CardSelected or Theme.CardBg
             card.BorderSizePixel = 0
-            card.Parent = scrollHolder
+            card.Parent = moduleListFrame
             Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
 
             local cardStroke = Instance.new("UIStroke", card)
-            cardStroke.Color = Theme.StrokeNormal
+            cardStroke.Color = (selectedModule == mod) and Theme.StrokeActive or Theme.StrokeDim
             cardStroke.Thickness = 1
-            cardStroke.Transparency = 1
 
-            -- Glowing State Indicator Dot
-            local dot = Instance.new("Frame")
-            dot.Size = UDim2.new(0, 7, 0, 7)
-            dot.Position = UDim2.new(0, 10, 0.5, -3.5)
-            dot.BackgroundColor3 = Color3.fromRGB(60, 65, 95)
-            dot.BorderSizePixel = 0
-            dot.Parent = card
-            Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+            -- Module Name
+            local nameLbl = Instance.new("TextLabel")
+            nameLbl.Size = UDim2.new(1, -78, 1, 0)
+            nameLbl.Position = UDim2.new(0, 10, 0, 0)
+            nameLbl.BackgroundTransparency = 1
+            nameLbl.Font = Enum.Font.GothamMedium
+            nameLbl.Text = mod.Name or ""
+            nameLbl.TextColor3 = mod.Enabled and Theme.TextPrimary or Theme.TextSecondary
+            nameLbl.TextSize = 11
+            nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+            nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
+            nameLbl.Parent = card
 
-            -- Module Name Label
-            local nameLabel = Instance.new("TextLabel")
-            nameLabel.Size = UDim2.new(1, -66, 1, 0)
-            nameLabel.Position = UDim2.new(0, 24, 0, 0)
-            nameLabel.BackgroundTransparency = 1
-            nameLabel.Font = Enum.Font.GothamMedium
-            nameLabel.TextSize = 11
-            nameLabel.TextColor3 = Theme.TextSecondary
-            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-            nameLabel.Text = mod.Name or ""
-            nameLabel.Parent = card
+            -- Keybind indicator tag
+            local kbTag = Instance.new("TextLabel")
+            kbTag.Size = UDim2.new(0, 26, 0, 14)
+            kbTag.Position = UDim2.new(1, -72, 0.5, -7)
+            kbTag.BackgroundTransparency = 1
+            kbTag.Font = Enum.Font.GothamBold
+            kbTag.Text = ModuleManager.Keybinds[mod.Name] and ("[" .. ModuleManager.Keybinds[mod.Name]:sub(1, 3) .. "]") or ""
+            kbTag.TextColor3 = Theme.TextMuted
+            kbTag.TextSize = 9
+            kbTag.TextXAlignment = Enum.TextXAlignment.Right
+            kbTag.Parent = card
 
-            -- Keybind Badge
-            local kbLabel = Instance.new("TextLabel")
-            kbLabel.Size = UDim2.new(0, 24, 0, 16)
-            kbLabel.Position = UDim2.new(1, -46, 0.5, -8)
-            kbLabel.BackgroundTransparency = 1
-            kbLabel.Font = Enum.Font.GothamBold
-            kbLabel.TextSize = 9
-            kbLabel.TextColor3 = Theme.TextMuted
-            kbLabel.TextXAlignment = Enum.TextXAlignment.Right
-            kbLabel.Text = ModuleManager.Keybinds[mod.Name] and ("[" .. ModuleManager.Keybinds[mod.Name]:sub(1, 4) .. "]") or ""
-            kbLabel.Parent = card
+            -- Modern Toggle Switch on Card
+            local sw = Instance.new("TextButton")
+            sw.Size = UDim2.new(0, 34, 0, 18)
+            sw.Position = UDim2.new(1, -42, 0.5, -9)
+            sw.BackgroundColor3 = mod.Enabled and Theme.SwitchOn or Theme.SwitchOff
+            sw.BorderSizePixel = 0
+            sw.AutoButtonColor = false
+            sw.Text = ""
+            sw.Parent = card
+            Instance.new("UICorner", sw).CornerRadius = UDim.new(1, 0)
 
-            -- Gear / Settings Icon Button
-            local gearBtn = Instance.new("TextButton")
-            gearBtn.Size = UDim2.new(0, 20, 0, 20)
-            gearBtn.Position = UDim2.new(1, -22, 0.5, -10)
-            gearBtn.BackgroundTransparency = 1
-            gearBtn.Font = Enum.Font.GothamBold
-            gearBtn.Text = "⚙"
-            gearBtn.TextSize = 11
-            gearBtn.TextColor3 = Theme.TextMuted
-            gearBtn.Parent = card
+            local th = Instance.new("Frame")
+            th.Size = UDim2.new(0, 12, 0, 12)
+            th.Position = mod.Enabled and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
+            th.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            th.BorderSizePixel = 0
+            th.Parent = sw
+            Instance.new("UICorner", th).CornerRadius = UDim.new(1, 0)
 
-            -- Full Card Invisible Button for Left / Right Click
-            local triggerBtn = Instance.new("TextButton")
-            triggerBtn.Size = UDim2.new(1, -24, 1, 0)
-            triggerBtn.Position = UDim2.new(0, 0, 0, 0)
-            triggerBtn.BackgroundTransparency = 1
-            triggerBtn.Text = ""
-            triggerBtn.Parent = card
+            -- Invisible button over card body to select module
+            local selectBtn = Instance.new("TextButton")
+            selectBtn.Size = UDim2.new(1, -44, 1, 0)
+            selectBtn.Position = UDim2.new(0, 0, 0, 0)
+            selectBtn.BackgroundTransparency = 1
+            selectBtn.Text = ""
+            selectBtn.Parent = card
 
-            local info = {
-                card      = card,
-                mod       = mod,
-                dot       = dot,
-                nameLabel = nameLabel,
-                kbLabel   = kbLabel,
-                stroke    = cardStroke,
-            }
-
-            local function updateColors()
-                local isSelected = (settingsOpen and settingsModName == mod.Name)
-                if mod.Enabled then
-                    tweenColor(card, Color3.fromRGB(38, 42, 75))
-                    nameLabel.TextColor3 = Theme.TextPrimary
-                    dot.BackgroundColor3 = Theme.ItemActiveDot
-                    cardStroke.Color = Theme.ItemActive
-                    cardStroke.Transparency = isSelected and 0 or 0.3
-                else
-                    tweenColor(card, isSelected and Color3.fromRGB(30, 33, 52) or Theme.ItemBg)
-                    nameLabel.TextColor3 = isSelected and Theme.TextPrimary or Theme.TextSecondary
-                    dot.BackgroundColor3 = Color3.fromRGB(60, 65, 95)
-                    cardStroke.Color = Theme.StrokeAccent
-                    cardStroke.Transparency = isSelected and 0.4 or 1
-                end
+            local function updateCardVisuals()
+                local isSel = (selectedModule == mod)
+                card.BackgroundColor3 = isSel and Theme.CardSelected or Theme.CardBg
+                cardStroke.Color = isSel and Theme.StrokeActive or Theme.StrokeDim
+                nameLbl.TextColor3 = mod.Enabled and Theme.TextPrimary or (isSel and Theme.TextPrimary or Theme.TextSecondary)
+                tween(sw, { BackgroundColor3 = mod.Enabled and Theme.SwitchOn or Theme.SwitchOff })
+                tween(th, { Position = mod.Enabled and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6) })
             end
-            info.updateColors = updateColors
-            updateColors()
 
-            -- SINGLE CLICK ON CARD = TOGGLE MODULE
-            triggerBtn.MouseButton1Click:Connect(function()
+            -- Click switch -> Toggle on/off
+            sw.MouseButton1Click:Connect(function()
                 ModuleManager:SetEnabled(mod, not mod.Enabled)
-                updateColors()
-                updateActiveCounter()
+                updateCardVisuals()
+                if selectedModule == mod then
+                    renderInspector(mod)
+                end
                 if mod.Enabled then
                     notify(mod.Name .. " включён", 2, Theme.Success)
                 else
@@ -856,107 +977,131 @@ function Gui.Init(ModuleManager, Notifications)
                 end
             end)
 
-            -- RIGHT CLICK ON CARD = OPEN SETTINGS
-            triggerBtn.MouseButton2Click:Connect(function()
-                if settingsOpen and settingsModName == mod.Name then
-                    renderSettingsPanel(nil)
-                else
-                    renderSettingsPanel(mod)
+            -- Click card -> Select and inspect
+            selectBtn.MouseButton1Click:Connect(function()
+                selectedModule = mod
+                for _, item in ipairs(moduleCardItems) do
+                    if item.updateVisuals then item.updateVisuals() end
+                end
+                renderInspector(mod)
+            end)
+
+            -- Hover effect
+            selectBtn.MouseEnter:Connect(function()
+                if selectedModule ~= mod then
+                    tween(card, { BackgroundColor3 = Theme.CardHover })
                 end
             end)
-
-            -- GEAR ICON = OPEN SETTINGS
-            gearBtn.MouseButton1Click:Connect(function()
-                if settingsOpen and settingsModName == mod.Name then
-                    renderSettingsPanel(nil)
-                else
-                    renderSettingsPanel(mod)
-                end
+            selectBtn.MouseLeave:Connect(function()
+                updateCardVisuals()
             end)
 
-            gearBtn.MouseEnter:Connect(function()
-                gearBtn.TextColor3 = Theme.TextPrimary
-            end)
-            gearBtn.MouseLeave:Connect(function()
-                gearBtn.TextColor3 = Theme.TextMuted
-            end)
-
-            -- Hover Effect on Card
-            triggerBtn.MouseEnter:Connect(function()
-                if not mod.Enabled and not (settingsOpen and settingsModName == mod.Name) then
-                    tweenColor(card, Theme.ItemHover)
-                end
-            end)
-
-            triggerBtn.MouseLeave:Connect(function()
-                updateColors()
-            end)
-
-            table.insert(allButtons, info)
+            table.insert(moduleCardItems, {
+                mod           = mod,
+                card          = card,
+                kbTag         = kbTag,
+                updateState   = updateCardVisuals,
+                updateVisuals = updateCardVisuals,
+            })
         end
     end
 
-    -- ========== REBUILD COLUMNS ==========
-    local preferredOrder = {"Combat", "Movement", "Visuals", "Player", "Misc"}
-
-    local function rebuildColumns()
-        allButtons = {}
-        for _, child in ipairs(columnsHolder:GetChildren()) do
-            if child:IsA("GuiObject") and child.Name ~= "UIListLayout" then
-                child:Destroy()
-            end
+    -- ========== SIDEBAR CATEGORY BUTTONS ==========
+    local function renderCategories()
+        for _, btn in ipairs(categoryButtons) do
+            btn:Destroy()
         end
+        categoryButtons = {}
 
-        local categoryNames = {}
-        for catName, _ in pairs(ModuleManager.Categories) do
-            table.insert(categoryNames, catName)
+        for _, cat in ipairs(CategoryData) do
+            local isSelected = (selectedCategory == cat.Id)
+
+            local btn = Instance.new("TextButton")
+            btn.Name = "Cat_" .. cat.Id
+            btn.Size = UDim2.new(1, 0, 0, 32)
+            btn.BackgroundColor3 = isSelected and Theme.PanelHeader or Color3.fromRGB(20, 23, 34)
+            btn.BackgroundTransparency = isSelected and 0 or 1
+            btn.BorderSizePixel = 0
+            btn.AutoButtonColor = false
+            btn.Text = ""
+            btn.Parent = catContainer
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+
+            local btnStroke = Instance.new("UIStroke", btn)
+            btnStroke.Color = isSelected and Theme.StrokeActive or Theme.StrokeDim
+            btnStroke.Thickness = 1
+            btnStroke.Transparency = isSelected and 0 or 1
+
+            local iconLbl = Instance.new("TextLabel")
+            iconLbl.Size = UDim2.new(0, 20, 1, 0)
+            iconLbl.Position = UDim2.new(0, 10, 0, 0)
+            iconLbl.BackgroundTransparency = 1
+            iconLbl.Font = Enum.Font.GothamBold
+            iconLbl.Text = cat.Icon
+            iconLbl.TextColor3 = isSelected and Theme.AccentGlow or Theme.TextMuted
+            iconLbl.TextSize = 13
+            iconLbl.Parent = btn
+
+            local nameLbl = Instance.new("TextLabel")
+            nameLbl.Size = UDim2.new(1, -38, 1, 0)
+            nameLbl.Position = UDim2.new(0, 34, 0, 0)
+            nameLbl.BackgroundTransparency = 1
+            nameLbl.Font = Enum.Font.GothamMedium
+            nameLbl.Text = cat.Name
+            nameLbl.TextColor3 = isSelected and Theme.TextPrimary or Theme.TextSecondary
+            nameLbl.TextSize = 11
+            nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+            nameLbl.Parent = btn
+
+            btn.MouseButton1Click:Connect(function()
+                if selectedCategory == cat.Id then return end
+                selectedCategory = cat.Id
+                categoryHeaderTitle.Text = cat.Name
+                renderCategories()
+                renderModuleList()
+            end)
+
+            btn.MouseEnter:Connect(function()
+                if selectedCategory ~= cat.Id then
+                    tween(btn, { BackgroundTransparency = 0.5 })
+                end
+            end)
+            btn.MouseLeave:Connect(function()
+                if selectedCategory ~= cat.Id then
+                    tween(btn, { BackgroundTransparency = 1 })
+                end
+            end)
+
+            table.insert(categoryButtons, btn)
         end
-
-        table.sort(categoryNames, function(a, b)
-            local ia, ib
-            for i, v in ipairs(preferredOrder) do
-                if v == a then ia = i end
-                if v == b then ib = i end
-            end
-            if ia and ib then return ia < ib
-            elseif ia then return true
-            elseif ib then return false
-            else return a < b end
-        end)
-
-        local idx = 1
-        for _, catName in ipairs(categoryNames) do
-            if #ModuleManager.Categories[catName] > 0 then
-                createCategoryColumn(catName, ModuleManager.Categories[catName], idx)
-                idx = idx + 1
-            end
-        end
-
-        updateActiveCounter()
     end
 
-    rebuildColumns()
+    renderCategories()
+    renderModuleList()
 
     -- ========== SEARCH FILTER ==========
-    local function applySearch()
-        local q = searchBox.Text:lower()
-        for _, info in ipairs(allButtons) do
-            local name = (info.mod.Name or ""):lower()
-            local cat  = (info.mod.Category or ""):lower()
-            local visible = (q == "") or (string.find(name, q, 1, true) ~= nil) or (string.find(cat, q, 1, true) ~= nil)
-            info.card.Visible = visible
+    searchInput:GetPropertyChangedSignal("Text"):Connect(function()
+        searchQuery = searchInput.Text
+        if searchQuery ~= "" then
+            categoryHeaderTitle.Text = "Результаты поиска"
+        else
+            for _, c in ipairs(CategoryData) do
+                if c.Id == selectedCategory then
+                    categoryHeaderTitle.Text = c.Name
+                    break
+                end
+            end
         end
-    end
+        renderModuleList()
+    end)
 
-    searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
-
-    -- ========== RELOAD BUTTON EVENT ==========
+    -- ========== RELOAD BUTTON ==========
     reloadBtn.MouseEnter:Connect(function()
-        tweenColor(reloadBtn, Color3.fromRGB(36, 40, 64))
+        tween(reloadBtn, { BackgroundColor3 = Theme.CardHover })
         reloadBtn.TextColor3 = Theme.TextPrimary
     end)
     reloadBtn.MouseLeave:Connect(function()
-        tweenColor(reloadBtn, Color3.fromRGB(24, 27, 44))
+        tween(reloadBtn, { BackgroundColor3 = Theme.PanelHeader })
         reloadBtn.TextColor3 = Theme.TextSecondary
     end)
 
@@ -964,12 +1109,7 @@ function Gui.Init(ModuleManager, Notifications)
         if ModuleManager.ReloadFromManifest then
             local ok, err = pcall(function() ModuleManager:ReloadFromManifest() end)
             if ok then
-                rebuildColumns()
-                applySearch()
-                if settingsOpen and settingsModName then
-                    local m = ModuleManager:GetModuleByName(settingsModName)
-                    if m then renderSettingsPanel(m) else renderSettingsPanel(nil) end
-                end
+                renderModuleList()
                 notify("Модули обновлены!", 2, Theme.Success)
             else
                 notify("Ошибка обновления: " .. tostring(err), 4, Theme.Danger)
@@ -977,13 +1117,13 @@ function Gui.Init(ModuleManager, Notifications)
         end
     end)
 
-    -- ========== CLOSE BUTTON EVENT ==========
+    -- ========== CLOSE BUTTON ==========
     closeBtn.MouseEnter:Connect(function()
-        tweenColor(closeBtn, Theme.Danger)
+        tween(closeBtn, { BackgroundColor3 = Theme.Danger })
         closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     end)
     closeBtn.MouseLeave:Connect(function()
-        tweenColor(closeBtn, Color3.fromRGB(24, 27, 44))
+        tween(closeBtn, { BackgroundColor3 = Theme.PanelHeader })
         closeBtn.TextColor3 = Theme.TextSecondary
     end)
 
@@ -997,18 +1137,23 @@ function Gui.Init(ModuleManager, Notifications)
     local dragStartPos = nil
     local frameStartPos = nil
 
-    headerBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingWindow = true
-            dragStartPos = input.Position
-            frameStartPos = dragFrame.Position
-        end
-    end)
+    local function setupDragOn(inst)
+        inst.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingWindow = true
+                dragStartPos = input.Position
+                frameStartPos = mainWindow.Position
+            end
+        end)
+    end
+
+    setupDragOn(headerCard)
+    setupDragOn(brandCard)
 
     UserInputService.InputChanged:Connect(function(input)
         if draggingWindow and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStartPos
-            dragFrame.Position = UDim2.new(
+            mainWindow.Position = UDim2.new(
                 frameStartPos.X.Scale, frameStartPos.X.Offset + delta.X,
                 frameStartPos.Y.Scale, frameStartPos.Y.Offset + delta.Y
             )
@@ -1021,22 +1166,22 @@ function Gui.Init(ModuleManager, Notifications)
         end
     end)
 
-    -- ========== OPEN / CLOSE ANIMATIONS ==========
+    -- ========== OPEN / CLOSE ANIMATION ==========
     local function playOpenAnim()
         screenGui.Enabled = true
-        dragFrame.Position = UDim2.new(0.5, -totalWidth / 2, 0.5, -totalHeight / 2 - 25)
+        mainWindow.Position = UDim2.new(0.5, -WIN_WIDTH / 2, 0.5, -WIN_HEIGHT / 2 - 20)
         TweenService:Create(
-            dragFrame,
+            mainWindow,
             TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            { Position = UDim2.new(0.5, -totalWidth / 2, 0.5, -totalHeight / 2) }
+            { Position = UDim2.new(0.5, -WIN_WIDTH / 2, 0.5, -WIN_HEIGHT / 2) }
         ):Play()
     end
 
     local function playCloseAnim()
         local t = TweenService:Create(
-            dragFrame,
+            mainWindow,
             TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            { Position = UDim2.new(0.5, -totalWidth / 2, 0.5, -totalHeight / 2 - 25) }
+            { Position = UDim2.new(0.5, -WIN_WIDTH / 2, 0.5, -WIN_HEIGHT / 2 - 20) }
         )
         t:Play()
         t.Completed:Connect(function()
@@ -1077,10 +1222,14 @@ function Gui.Init(ModuleManager, Notifications)
                     local mod = ModuleManager:GetModuleByName(modName)
                     if mod then
                         ModuleManager:SetEnabled(mod, not mod.Enabled)
-                        for _, b in ipairs(allButtons) do
-                            if b.updateColors then b.updateColors() end
+                        for _, item in ipairs(moduleCardItems) do
+                            if item.mod == mod and item.updateState then
+                                item.updateState()
+                            end
                         end
-                        updateActiveCounter()
+                        if selectedModule == mod then
+                            renderInspector(mod)
+                        end
                         if mod.Enabled then
                             notify(mod.Name .. " включён", 2, Theme.Success)
                         else
@@ -1101,10 +1250,14 @@ function Gui.Init(ModuleManager, Notifications)
                         local mod = ModuleManager:GetModuleByName(modName)
                         if mod then
                             ModuleManager:SetEnabled(mod, not mod.Enabled)
-                            for _, b in ipairs(allButtons) do
-                                if b.updateColors then b.updateColors() end
+                            for _, item in ipairs(moduleCardItems) do
+                                if item.mod == mod and item.updateState then
+                                    item.updateState()
+                                end
                             end
-                            updateActiveCounter()
+                            if selectedModule == mod then
+                                renderInspector(mod)
+                            end
                             if mod.Enabled then
                                 notify(mod.Name .. " включён", 2, Theme.Success)
                             else
