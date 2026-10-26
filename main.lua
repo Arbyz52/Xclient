@@ -121,6 +121,22 @@ function ModuleManager:RegisterModule(mod)
     mod.Enabled  = mod.Enabled or false
     mod.Category = mod.Category or "Misc"
 
+    -- Prevent duplicates
+    for i, existing in ipairs(self.Modules) do
+        if existing.Name == mod.Name then
+            self.Modules[i] = mod
+            if self.Categories[mod.Category] then
+                for ci, cmod in ipairs(self.Categories[mod.Category]) do
+                    if cmod.Name == mod.Name then
+                        self.Categories[mod.Category][ci] = mod
+                        return
+                    end
+                end
+            end
+            return
+        end
+    end
+
     self.Categories[mod.Category] = self.Categories[mod.Category] or {}
     table.insert(self.Modules, mod)
     table.insert(self.Categories[mod.Category], mod)

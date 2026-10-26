@@ -14,7 +14,13 @@ function Gui.Init(ModuleManager, Notifications)
         if gethui then parent = gethui() end
     end)
 
-    -- ========== LUCIDE VECTOR ICON ASSETS (SHARP & NATIVE) ==========
+    -- Удаляем старое меню, чтобы при повторном запуске скрипта ничего не дублировалось!
+    pcall(function()
+        local old = parent:FindFirstChild("XclientMenu")
+        if old then old:Destroy() end
+    end)
+
+    -- ========== LUCIDE VECTOR ICON ASSETS ==========
     local Icons = {
         Swords      = "rbxassetid://10734975692", -- Combat
         Wind        = "rbxassetid://10747382750", -- Movement
@@ -27,48 +33,47 @@ function Gui.Init(ModuleManager, Notifications)
         Refresh     = "rbxassetid://10734940654", -- Reload Manifest
         Close       = "rbxassetid://10747384394", -- Close Window
         ChevronDown = "rbxassetid://10709790948", -- Dropdown Arrow
-        Zap         = "rbxassetid://10723376114", -- Logo
+        Zap         = "rbxassetid://10723376114", -- Logo Zap
+        GlowShadow  = "rbxassetid://5028857472", -- 9-slice True Glow Texture
     }
 
-    -- ========== THICK MODERN FONTS ==========
-    local BoldFont     = Enum.Font.Montserrat
-    local HeavyFont    = Enum.Font.GothamBold
-    local SemiBoldFont = Enum.Font.GothamBold
+    -- ========== БЕЗУПРЕЧНЫЙ ПЛОТНЫЙ ШРИФТ ДЛЯ КИРИЛЛИЦЫ И ЛАТИНИЦЫ ==========
+    -- GothamBold в Roblox имеет 100% полную поддержку русского языка без разрывов между буквами!
+    local MainFont = Enum.Font.GothamBold
 
-    -- ========== MENU SETTINGS & THEME STATE ==========
+    -- ========== MENU CONFIG & RICH THEME ==========
     local MenuConfig = {
         LiquidGlass    = true,
         MenuGlow       = true,
-        WindowOpacity  = 0.95,
+        WindowOpacity  = 0.92,
         AnimationSpeed = 1.0,
-        AccentColor    = Color3.fromRGB(120, 100, 255), -- Фирменный Rich Purple/Indigo
+        AccentColor    = Color3.fromRGB(120, 100, 255), -- Rich-фиолетовый
     }
 
     local AccentPresets = {
-        { Name = "Фиолетовый", Color = Color3.fromRGB(120, 100, 255) },
+        { Name = "Фиолетовый",   Color = Color3.fromRGB(120, 100, 255) },
         { Name = "Электро-циан", Color = Color3.fromRGB(56, 189, 248) },
-        { Name = "Изумруд",    Color = Color3.fromRGB(34, 197, 94) },
-        { Name = "Рубин",      Color = Color3.fromRGB(239, 68, 68) },
-        { Name = "Янтарь",     Color = Color3.fromRGB(245, 158, 11) },
+        { Name = "Изумруд",      Color = Color3.fromRGB(34, 197, 94) },
+        { Name = "Рубин",        Color = Color3.fromRGB(239, 68, 68) },
+        { Name = "Янтарь",       Color = Color3.fromRGB(245, 158, 11) },
         { Name = "Неон-розовый", Color = Color3.fromRGB(236, 72, 153) },
-        { Name = "Синий",      Color = Color3.fromRGB(59, 130, 246) },
+        { Name = "Синий",        Color = Color3.fromRGB(59, 130, 246) },
     }
 
     local Theme = {
-        WindowBg      = Color3.fromRGB(13, 15, 22),
-        PanelBg       = Color3.fromRGB(18, 21, 32),
-        PanelHeader   = Color3.fromRGB(24, 28, 44),
-        CardBg        = Color3.fromRGB(23, 27, 40),
-        CardHover     = Color3.fromRGB(30, 36, 54),
-        CardSelected  = Color3.fromRGB(34, 40, 62),
-        StrokeDim     = Color3.fromRGB(38, 43, 62),
-        StrokeGlass   = Color3.fromRGB(255, 255, 255),
-        TextPrimary   = Color3.fromRGB(250, 252, 255),
-        TextSecondary = Color3.fromRGB(165, 175, 195),
-        TextMuted     = Color3.fromRGB(105, 115, 138),
+        WindowBg      = Color3.fromRGB(14, 16, 25),
+        PanelBg       = Color3.fromRGB(19, 22, 34),
+        PanelHeader   = Color3.fromRGB(25, 29, 45),
+        CardBg        = Color3.fromRGB(24, 28, 43),
+        CardHover     = Color3.fromRGB(32, 38, 58),
+        CardSelected  = Color3.fromRGB(36, 42, 65),
+        StrokeDim     = Color3.fromRGB(40, 45, 66),
+        TextPrimary   = Color3.fromRGB(255, 255, 255),
+        TextSecondary = Color3.fromRGB(175, 183, 202),
+        TextMuted     = Color3.fromRGB(110, 120, 142),
         Success       = Color3.fromRGB(34, 197, 94),
         Danger        = Color3.fromRGB(239, 68, 68),
-        SwitchOff     = Color3.fromRGB(36, 42, 60),
+        SwitchOff     = Color3.fromRGB(38, 43, 62),
     }
 
     local Categories = {
@@ -106,6 +111,20 @@ function Gui.Init(ModuleManager, Notifications)
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     screenGui.Parent = parent
 
+    -- ========== TRUE NEON GLOW BLOOM (9-SLICE PNG) ==========
+    local glowShadow = Instance.new("ImageLabel")
+    glowShadow.Name = "NeonGlowBloom"
+    glowShadow.Size = UDim2.new(0, currentWidth + 60, 0, currentHeight + 60)
+    glowShadow.Position = UDim2.new(0.5, -(currentWidth + 60) / 2, 0.5, -(currentHeight + 60) / 2)
+    glowShadow.BackgroundTransparency = 1
+    glowShadow.Image = Icons.GlowShadow
+    glowShadow.ImageColor3 = MenuConfig.AccentColor
+    glowShadow.ImageTransparency = MenuConfig.MenuGlow and 0.55 or 1
+    glowShadow.ScaleType = Enum.ScaleType.Slice
+    glowShadow.SliceCenter = Rect.new(24, 24, 276, 276)
+    glowShadow.ZIndex = 1
+    glowShadow.Parent = screenGui
+
     -- ========== MAIN WINDOW (RICH-MODERN SHELL) ==========
     local mainWindow = Instance.new("Frame")
     mainWindow.Name = "RichModernWindow"
@@ -115,12 +134,13 @@ function Gui.Init(ModuleManager, Notifications)
     mainWindow.BackgroundTransparency = 1 - MenuConfig.WindowOpacity
     mainWindow.BorderSizePixel = 0
     mainWindow.ClipsDescendants = false
+    mainWindow.ZIndex = 2
     mainWindow.Parent = screenGui
     Instance.new("UICorner", mainWindow).CornerRadius = UDim.new(0, 16)
 
     -- Liquid Glass Specular Gradient Stroke
     local mainStroke = Instance.new("UIStroke", mainWindow)
-    mainStroke.Color = Theme.StrokeGlass
+    mainStroke.Color = Color3.fromRGB(255, 255, 255)
     mainStroke.Thickness = 1.4
     mainStroke.Transparency = 0.82
 
@@ -133,24 +153,25 @@ function Gui.Init(ModuleManager, Notifications)
         ColorSequenceKeypoint.new(1.0, Color3.fromRGB(255, 255, 255)),
     })
     strokeGradient.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0.0, 0.2),
-        NumberSequenceKeypoint.new(0.4, 0.6),
-        NumberSequenceKeypoint.new(1.0, 0.9),
+        NumberSequenceKeypoint.new(0.0, 0.25),
+        NumberSequenceKeypoint.new(0.4, 0.65),
+        NumberSequenceKeypoint.new(1.0, 0.92),
     })
 
     -- Specular Glass Highlight Line (Top Sheen)
     local topSheen = Instance.new("Frame")
     topSheen.Name = "TopGlassSheen"
-    topSheen.Size = UDim2.new(1, -32, 0, 1)
+    topSheen.Size = UDim2.new(1, -32, 0, 1.5)
     topSheen.Position = UDim2.new(0, 16, 0, 1)
     topSheen.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     topSheen.BorderSizePixel = 0
+    topSheen.ZIndex = 3
     topSheen.Parent = mainWindow
 
     local sheenGrad = Instance.new("UIGradient", topSheen)
     sheenGrad.Transparency = NumberSequence.new({
         NumberSequenceKeypoint.new(0.0, 1.0),
-        NumberSequenceKeypoint.new(0.5, 0.5),
+        NumberSequenceKeypoint.new(0.5, 0.4),
         NumberSequenceKeypoint.new(1.0, 1.0),
     })
 
@@ -176,6 +197,7 @@ function Gui.Init(ModuleManager, Notifications)
 
     local function applyAccentColor(newColor)
         MenuConfig.AccentColor = newColor
+        glowShadow.ImageColor3 = newColor
         for _, obj in ipairs(accentColorObjects) do
             if obj.inst and obj.inst.Parent then
                 obj.inst[obj.prop] = newColor
@@ -198,8 +220,9 @@ function Gui.Init(ModuleManager, Notifications)
     sidebar.Size = UDim2.new(0, SIDEBAR_WIDTH, 1, -PADDING * 2)
     sidebar.Position = UDim2.new(0, PADDING, 0, PADDING)
     sidebar.BackgroundColor3 = Theme.PanelBg
-    sidebar.BackgroundTransparency = 0.2
+    sidebar.BackgroundTransparency = 0.25
     sidebar.BorderSizePixel = 0
+    sidebar.ZIndex = 2
     sidebar.Parent = mainWindow
     Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 12)
 
@@ -214,6 +237,7 @@ function Gui.Init(ModuleManager, Notifications)
     brandCard.Position = UDim2.new(0, 8, 0, 8)
     brandCard.BackgroundColor3 = Theme.PanelHeader
     brandCard.BorderSizePixel = 0
+    brandCard.ZIndex = 3
     brandCard.Parent = sidebar
     Instance.new("UICorner", brandCard).CornerRadius = UDim.new(0, 10)
 
@@ -228,6 +252,7 @@ function Gui.Init(ModuleManager, Notifications)
     logoImg.BackgroundTransparency = 1
     logoImg.Image = Icons.Zap
     logoImg.ImageColor3 = MenuConfig.AccentColor
+    logoImg.ZIndex = 4
     logoImg.Parent = brandCard
     registerAccent(logoImg, "ImageColor3")
 
@@ -235,22 +260,24 @@ function Gui.Init(ModuleManager, Notifications)
     brandTitle.Size = UDim2.new(1, -44, 0, 20)
     brandTitle.Position = UDim2.new(0, 38, 0, 6)
     brandTitle.BackgroundTransparency = 1
-    brandTitle.Font = BoldFont
+    brandTitle.Font = MainFont
     brandTitle.Text = "XCLIENT"
     brandTitle.TextColor3 = Theme.TextPrimary
     brandTitle.TextSize = 16
     brandTitle.TextXAlignment = Enum.TextXAlignment.Left
+    brandTitle.ZIndex = 4
     brandTitle.Parent = brandCard
 
     local brandSub = Instance.new("TextLabel")
     brandSub.Size = UDim2.new(1, -44, 0, 14)
     brandSub.Position = UDim2.new(0, 38, 0, 26)
     brandSub.BackgroundTransparency = 1
-    brandSub.Font = HeavyFont
+    brandSub.Font = MainFont
     brandSub.Text = "v2.0 • Modern"
     brandSub.TextColor3 = Color3.fromRGB(56, 189, 248)
     brandSub.TextSize = 11
     brandSub.TextXAlignment = Enum.TextXAlignment.Left
+    brandSub.ZIndex = 4
     brandSub.Parent = brandCard
 
     -- Categories Buttons Container
@@ -259,6 +286,7 @@ function Gui.Init(ModuleManager, Notifications)
     catContainer.Size = UDim2.new(1, -16, 1, -132)
     catContainer.Position = UDim2.new(0, 8, 0, 68)
     catContainer.BackgroundTransparency = 1
+    catContainer.ZIndex = 3
     catContainer.Parent = sidebar
 
     local catLayout = Instance.new("UIListLayout", catContainer)
@@ -273,6 +301,7 @@ function Gui.Init(ModuleManager, Notifications)
     profileCard.Position = UDim2.new(0, 8, 1, -56)
     profileCard.BackgroundColor3 = Theme.PanelHeader
     profileCard.BorderSizePixel = 0
+    profileCard.ZIndex = 3
     profileCard.Parent = sidebar
     Instance.new("UICorner", profileCard).CornerRadius = UDim.new(0, 10)
 
@@ -286,6 +315,7 @@ function Gui.Init(ModuleManager, Notifications)
     avatarImg.Position = UDim2.new(0, 8, 0.5, -16)
     avatarImg.BackgroundColor3 = Color3.fromRGB(30, 35, 52)
     avatarImg.BorderSizePixel = 0
+    avatarImg.ZIndex = 4
     pcall(function()
         if LocalPlayer and LocalPlayer.UserId then
             avatarImg.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(LocalPlayer.UserId) .. "&w=48&h=48"
@@ -298,23 +328,25 @@ function Gui.Init(ModuleManager, Notifications)
     profileName.Size = UDim2.new(1, -48, 0, 18)
     profileName.Position = UDim2.new(0, 46, 0, 7)
     profileName.BackgroundTransparency = 1
-    profileName.Font = HeavyFont
+    profileName.Font = MainFont
     profileName.Text = (LocalPlayer and LocalPlayer.DisplayName) or "Player"
     profileName.TextColor3 = Theme.TextPrimary
     profileName.TextSize = 13
     profileName.TextXAlignment = Enum.TextXAlignment.Left
     profileName.TextTruncate = Enum.TextTruncate.AtEnd
+    profileName.ZIndex = 4
     profileName.Parent = profileCard
 
     local profileStatus = Instance.new("TextLabel")
     profileStatus.Size = UDim2.new(1, -48, 0, 14)
     profileStatus.Position = UDim2.new(0, 46, 0, 25)
     profileStatus.BackgroundTransparency = 1
-    profileStatus.Font = HeavyFont
+    profileStatus.Font = MainFont
     profileStatus.Text = "Активен"
     profileStatus.TextColor3 = Theme.Success
     profileStatus.TextSize = 11
     profileStatus.TextXAlignment = Enum.TextXAlignment.Left
+    profileStatus.ZIndex = 4
     profileStatus.Parent = profileCard
 
     -- ========== RIGHT WORKSPACE AREA ==========
@@ -323,6 +355,7 @@ function Gui.Init(ModuleManager, Notifications)
     rightContainer.Size = UDim2.new(1, -SIDEBAR_WIDTH - PADDING * 3, 1, -PADDING * 2)
     rightContainer.Position = UDim2.new(0, SIDEBAR_WIDTH + PADDING * 2, 0, PADDING)
     rightContainer.BackgroundTransparency = 1
+    rightContainer.ZIndex = 2
     rightContainer.Parent = mainWindow
 
     -- 1. Top Header Card
@@ -332,8 +365,9 @@ function Gui.Init(ModuleManager, Notifications)
     headerCard.Size = UDim2.new(1, 0, 0, HEADER_HEIGHT)
     headerCard.Position = UDim2.new(0, 0, 0, 0)
     headerCard.BackgroundColor3 = Theme.PanelBg
-    headerCard.BackgroundTransparency = 0.2
+    headerCard.BackgroundTransparency = 0.25
     headerCard.BorderSizePixel = 0
+    headerCard.ZIndex = 2
     headerCard.Parent = rightContainer
     Instance.new("UICorner", headerCard).CornerRadius = UDim.new(0, 12)
 
@@ -346,51 +380,51 @@ function Gui.Init(ModuleManager, Notifications)
     categoryHeaderTitle.Size = UDim2.new(0, 220, 1, 0)
     categoryHeaderTitle.Position = UDim2.new(0, 16, 0, 0)
     categoryHeaderTitle.BackgroundTransparency = 1
-    categoryHeaderTitle.Font = BoldFont
+    categoryHeaderTitle.Font = MainFont
     categoryHeaderTitle.Text = "Combat"
     categoryHeaderTitle.TextColor3 = Theme.TextPrimary
     categoryHeaderTitle.TextSize = 18
     categoryHeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
+    categoryHeaderTitle.ZIndex = 3
     categoryHeaderTitle.Parent = headerCard
 
-    -- Action Buttons (Reload & Close) with Lucide Icons
+    -- Action Buttons (Reload & Close) - Frameless, sleek, rounded
     local closeBtn = Instance.new("ImageButton")
     closeBtn.Name = "CloseButton"
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -38, 0.5, -15)
-    closeBtn.BackgroundColor3 = Theme.PanelHeader
+    closeBtn.Size = UDim2.new(0, 32, 0, 32)
+    closeBtn.Position = UDim2.new(1, -40, 0.5, -16)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(26, 30, 46)
     closeBtn.BorderSizePixel = 0
+    closeBtn.AutoButtonColor = false
     closeBtn.Image = Icons.Close
     closeBtn.ImageColor3 = Theme.TextSecondary
     closeBtn.ScaleType = Enum.ScaleType.Fit
+    closeBtn.ZIndex = 4
     closeBtn.Parent = headerCard
-    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
-    local closeStroke = Instance.new("UIStroke", closeBtn)
-    closeStroke.Color = Theme.StrokeDim
-    closeStroke.Thickness = 1
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(1, 0)
 
     local reloadBtn = Instance.new("ImageButton")
     reloadBtn.Name = "ReloadButton"
-    reloadBtn.Size = UDim2.new(0, 30, 0, 30)
-    reloadBtn.Position = UDim2.new(1, -74, 0.5, -15)
-    reloadBtn.BackgroundColor3 = Theme.PanelHeader
+    reloadBtn.Size = UDim2.new(0, 32, 0, 32)
+    reloadBtn.Position = UDim2.new(1, -78, 0.5, -16)
+    reloadBtn.BackgroundColor3 = Color3.fromRGB(26, 30, 46)
     reloadBtn.BorderSizePixel = 0
+    reloadBtn.AutoButtonColor = false
     reloadBtn.Image = Icons.Refresh
     reloadBtn.ImageColor3 = Theme.TextSecondary
     reloadBtn.ScaleType = Enum.ScaleType.Fit
+    reloadBtn.ZIndex = 4
     reloadBtn.Parent = headerCard
-    Instance.new("UICorner", reloadBtn).CornerRadius = UDim.new(0, 8)
-    local reloadStroke = Instance.new("UIStroke", reloadBtn)
-    reloadStroke.Color = Theme.StrokeDim
-    reloadStroke.Thickness = 1
+    Instance.new("UICorner", reloadBtn).CornerRadius = UDim.new(1, 0)
 
     -- Search Box with Lucide Search Icon
     local searchContainer = Instance.new("Frame")
     searchContainer.Name = "SearchBox"
-    searchContainer.Size = UDim2.new(0, 220, 0, 30)
-    searchContainer.Position = UDim2.new(1, -304, 0.5, -15)
+    searchContainer.Size = UDim2.new(0, 220, 0, 32)
+    searchContainer.Position = UDim2.new(1, -310, 0.5, -16)
     searchContainer.BackgroundColor3 = Theme.PanelHeader
     searchContainer.BorderSizePixel = 0
+    searchContainer.ZIndex = 3
     searchContainer.Parent = headerCard
     Instance.new("UICorner", searchContainer).CornerRadius = UDim.new(0, 8)
 
@@ -404,13 +438,14 @@ function Gui.Init(ModuleManager, Notifications)
     searchIconImg.BackgroundTransparency = 1
     searchIconImg.Image = Icons.Search
     searchIconImg.ImageColor3 = Theme.TextMuted
+    searchIconImg.ZIndex = 4
     searchIconImg.Parent = searchContainer
 
     local searchInput = Instance.new("TextBox")
     searchInput.Size = UDim2.new(1, -36, 1, 0)
     searchInput.Position = UDim2.new(0, 30, 0, 0)
     searchInput.BackgroundTransparency = 1
-    searchInput.Font = HeavyFont
+    searchInput.Font = MainFont
     searchInput.PlaceholderText = "Поиск функций..."
     searchInput.PlaceholderColor3 = Theme.TextMuted
     searchInput.Text = ""
@@ -418,6 +453,7 @@ function Gui.Init(ModuleManager, Notifications)
     searchInput.TextSize = 13
     searchInput.TextXAlignment = Enum.TextXAlignment.Left
     searchInput.ClearTextOnFocus = false
+    searchInput.ZIndex = 4
     searchInput.Parent = searchContainer
 
     -- 2. Content Card
@@ -426,8 +462,9 @@ function Gui.Init(ModuleManager, Notifications)
     contentCard.Size = UDim2.new(1, 0, 1, -HEADER_HEIGHT - 8)
     contentCard.Position = UDim2.new(0, 0, 0, HEADER_HEIGHT + 8)
     contentCard.BackgroundColor3 = Theme.PanelBg
-    contentCard.BackgroundTransparency = 0.2
+    contentCard.BackgroundTransparency = 0.25
     contentCard.BorderSizePixel = 0
+    contentCard.ZIndex = 2
     contentCard.Parent = rightContainer
     Instance.new("UICorner", contentCard).CornerRadius = UDim.new(0, 12)
 
@@ -435,7 +472,7 @@ function Gui.Init(ModuleManager, Notifications)
     contentStroke.Color = Theme.StrokeDim
     contentStroke.Thickness = 1
 
-    -- Left Pane: Module List (Wider: 250px so text never clips!)
+    -- Left Pane: Module List
     local MODULE_LIST_WIDTH = 250
 
     local moduleListFrame = Instance.new("ScrollingFrame")
@@ -448,6 +485,7 @@ function Gui.Init(ModuleManager, Notifications)
     moduleListFrame.ScrollBarImageColor3 = Theme.StrokeDim
     moduleListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
     moduleListFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    moduleListFrame.ZIndex = 3
     moduleListFrame.Parent = contentCard
 
     local moduleListLayout = Instance.new("UIListLayout", moduleListFrame)
@@ -458,18 +496,20 @@ function Gui.Init(ModuleManager, Notifications)
     local divider = Instance.new("Frame")
     divider.Name = "Divider"
     divider.Size = UDim2.new(0, 1, 1, -16)
-    divider.Position = UDim2.new(0, MODULE_LIST_WIDTH + 20, 0, 8)
+    divider.Position = UDim2.new(0, MODULE_LIST_WIDTH + 18, 0, 8)
     divider.BackgroundColor3 = Theme.StrokeDim
     divider.BorderSizePixel = 0
+    divider.ZIndex = 3
     divider.Parent = contentCard
 
     -- Right Pane: Inspector / Settings Panel
-    local INSPECTOR_X = MODULE_LIST_WIDTH + 30
+    local INSPECTOR_X = MODULE_LIST_WIDTH + 26
     local inspectorFrame = Instance.new("Frame")
     inspectorFrame.Name = "Inspector"
     inspectorFrame.Size = UDim2.new(1, -INSPECTOR_X - 10, 1, -16)
     inspectorFrame.Position = UDim2.new(0, INSPECTOR_X, 0, 8)
     inspectorFrame.BackgroundTransparency = 1
+    inspectorFrame.ZIndex = 3
     inspectorFrame.Parent = contentCard
 
     local inspectorScroll = Instance.new("ScrollingFrame")
@@ -482,19 +522,21 @@ function Gui.Init(ModuleManager, Notifications)
     registerAccent(inspectorScroll, "ScrollBarImageColor3")
     inspectorScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     inspectorScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    inspectorScroll.ZIndex = 3
     inspectorScroll.Parent = inspectorFrame
 
     local inspectorLayout = Instance.new("UIListLayout", inspectorScroll)
-    inspectorLayout.Padding = UDim.new(0, 10)
+    inspectorLayout.Padding = UDim.new(0, 8)
     inspectorLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
     -- ========== RICH-MODERN RESIZE GRIP (3 DOTS BOTTOM-RIGHT) ==========
     local resizeGrip = Instance.new("TextButton")
     resizeGrip.Name = "ResizeGrip"
-    resizeGrip.Size = UDim2.new(0, 20, 0, 20)
-    resizeGrip.Position = UDim2.new(1, -22, 1, -22)
+    resizeGrip.Size = UDim2.new(0, 24, 0, 24)
+    resizeGrip.Position = UDim2.new(1, -26, 1, -26)
     resizeGrip.BackgroundTransparency = 1
     resizeGrip.Text = ""
+    resizeGrip.ZIndex = 10
     resizeGrip.Parent = mainWindow
 
     local function makeDot(offsetX, offsetY)
@@ -503,14 +545,15 @@ function Gui.Init(ModuleManager, Notifications)
         d.Position = UDim2.new(1, offsetX, 1, offsetY)
         d.BackgroundColor3 = Theme.TextMuted
         d.BorderSizePixel = 0
+        d.ZIndex = 10
         d.Parent = resizeGrip
         Instance.new("UICorner", d).CornerRadius = UDim.new(1, 0)
         return d
     end
 
     local dot1 = makeDot(-6, -6)
-    local dot2 = makeDot(-12, -6)
-    local dot3 = makeDot(-6, -12)
+    local dot2 = makeDot(-13, -6)
+    local dot3 = makeDot(-6, -13)
 
     local resizingWindow = false
     local resizeStartMouse = nil
@@ -554,10 +597,11 @@ function Gui.Init(ModuleManager, Notifications)
 
         -- Header Card
         local headerCardMod = Instance.new("Frame")
-        headerCardMod.Size = UDim2.new(1, -4, 0, 56)
+        headerCardMod.Size = UDim2.new(1, -6, 0, 56)
         headerCardMod.BackgroundColor3 = Theme.CardBg
         headerCardMod.BorderSizePixel = 0
         headerCardMod.LayoutOrder = 1
+        headerCardMod.ZIndex = 4
         headerCardMod.Parent = inspectorScroll
         Instance.new("UICorner", headerCardMod).CornerRadius = UDim.new(0, 10)
 
@@ -569,31 +613,34 @@ function Gui.Init(ModuleManager, Notifications)
         titleLbl.Size = UDim2.new(1, -24, 0, 24)
         titleLbl.Position = UDim2.new(0, 14, 0, 8)
         titleLbl.BackgroundTransparency = 1
-        titleLbl.Font = BoldFont
-        titleLbl.Text = "Настройки интерфейса (ClickGUI)"
+        titleLbl.Font = MainFont
+        titleLbl.Text = "Настройки интерфейса"
         titleLbl.TextColor3 = Theme.TextPrimary
         titleLbl.TextSize = 16
         titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+        titleLbl.ZIndex = 5
         titleLbl.Parent = headerCardMod
 
         local subLbl = Instance.new("TextLabel")
         subLbl.Size = UDim2.new(1, -24, 0, 16)
         subLbl.Position = UDim2.new(0, 14, 0, 32)
         subLbl.BackgroundTransparency = 1
-        subLbl.Font = HeavyFont
-        subLbl.Text = "Кастомизация визуала, цветов, Liquid Glass и размытия"
+        subLbl.Font = MainFont
+        subLbl.Text = "Liquid Glass, свечение меню, прозрачность и акценты"
         subLbl.TextColor3 = MenuConfig.AccentColor
         registerAccent(subLbl, "TextColor3")
-        subLbl.TextSize = 11
+        subLbl.TextSize = 12
         subLbl.TextXAlignment = Enum.TextXAlignment.Left
+        subLbl.ZIndex = 5
         subLbl.Parent = headerCardMod
 
         local function makeToggleRow(name, desc, state, onToggle, order)
             local row = Instance.new("Frame")
-            row.Size = UDim2.new(1, -4, 0, 50)
+            row.Size = UDim2.new(1, -6, 0, 50)
             row.BackgroundColor3 = Theme.CardBg
             row.BorderSizePixel = 0
             row.LayoutOrder = order
+            row.ZIndex = 4
             row.Parent = inspectorScroll
             Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
 
@@ -605,22 +652,24 @@ function Gui.Init(ModuleManager, Notifications)
             nl.Size = UDim2.new(1, -70, 0, 20)
             nl.Position = UDim2.new(0, 14, 0, 6)
             nl.BackgroundTransparency = 1
-            nl.Font = HeavyFont
+            nl.Font = MainFont
             nl.Text = name
             nl.TextColor3 = Theme.TextPrimary
             nl.TextSize = 13
             nl.TextXAlignment = Enum.TextXAlignment.Left
+            nl.ZIndex = 5
             nl.Parent = row
 
             local dl = Instance.new("TextLabel")
             dl.Size = UDim2.new(1, -70, 0, 16)
             dl.Position = UDim2.new(0, 14, 0, 26)
             dl.BackgroundTransparency = 1
-            dl.Font = HeavyFont
+            dl.Font = MainFont
             dl.Text = desc
             dl.TextColor3 = Theme.TextMuted
             dl.TextSize = 11
             dl.TextXAlignment = Enum.TextXAlignment.Left
+            dl.ZIndex = 5
             dl.Parent = row
 
             local sw = Instance.new("TextButton")
@@ -631,6 +680,7 @@ function Gui.Init(ModuleManager, Notifications)
             sw.BorderSizePixel = 0
             sw.AutoButtonColor = false
             sw.Text = ""
+            sw.ZIndex = 5
             sw.Parent = row
             Instance.new("UICorner", sw).CornerRadius = UDim.new(1, 0)
 
@@ -639,6 +689,7 @@ function Gui.Init(ModuleManager, Notifications)
             th.Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
             th.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             th.BorderSizePixel = 0
+            th.ZIndex = 6
             th.Parent = sw
             Instance.new("UICorner", th).CornerRadius = UDim.new(1, 0)
 
@@ -653,7 +704,7 @@ function Gui.Init(ModuleManager, Notifications)
         -- Row 2: Liquid Glass
         makeToggleRow(
             "Liquid Glass (Жидкое стекло)",
-            "Эффект глянцевого стекла и преломления света",
+            "Эффект преломления света и стеклянных граней",
             MenuConfig.LiquidGlass,
             function(v)
                 MenuConfig.LiquidGlass = v
@@ -664,24 +715,26 @@ function Gui.Init(ModuleManager, Notifications)
             2
         )
 
-        -- Row 3: Menu Glow (Свечение элементов)
+        -- Row 3: Menu Glow (Свечение меню)
         makeToggleRow(
             "Свечение меню (Menu Glow)",
-            "Неоновое свечение активных модулей и текста",
+            "Атмосферный неоновый блум вокруг окна",
             MenuConfig.MenuGlow,
             function(v)
                 MenuConfig.MenuGlow = v
-                notify("Menu Glow: " .. (v and "ВКЛ" or "ВЫКЛ"), 1.5, Theme.Success)
+                glowShadow.ImageTransparency = v and 0.55 or 1
+                notify("Свечение: " .. (v and "ВКЛ" or "ВЫКЛ"), 1.5, Theme.Success)
             end,
             3
         )
 
         -- Row 4: Цвет акцента (Presets)
         local colorCard = Instance.new("Frame")
-        colorCard.Size = UDim2.new(1, -4, 0, 74)
+        colorCard.Size = UDim2.new(1, -6, 0, 76)
         colorCard.BackgroundColor3 = Theme.CardBg
         colorCard.BorderSizePixel = 0
         colorCard.LayoutOrder = 4
+        colorCard.ZIndex = 4
         colorCard.Parent = inspectorScroll
         Instance.new("UICorner", colorCard).CornerRadius = UDim.new(0, 8)
 
@@ -693,17 +746,19 @@ function Gui.Init(ModuleManager, Notifications)
         ccTitle.Size = UDim2.new(1, -24, 0, 20)
         ccTitle.Position = UDim2.new(0, 14, 0, 8)
         ccTitle.BackgroundTransparency = 1
-        ccTitle.Font = HeavyFont
+        ccTitle.Font = MainFont
         ccTitle.Text = "Цвет интерфейса (Accent Color)"
         ccTitle.TextColor3 = Theme.TextPrimary
         ccTitle.TextSize = 13
         ccTitle.TextXAlignment = Enum.TextXAlignment.Left
+        ccTitle.ZIndex = 5
         ccTitle.Parent = colorCard
 
         local colorsHolder = Instance.new("Frame")
         colorsHolder.Size = UDim2.new(1, -28, 0, 32)
         colorsHolder.Position = UDim2.new(0, 14, 0, 34)
         colorsHolder.BackgroundTransparency = 1
+        colorsHolder.ZIndex = 5
         colorsHolder.Parent = colorCard
 
         local colorLayout = Instance.new("UIListLayout", colorsHolder)
@@ -713,11 +768,12 @@ function Gui.Init(ModuleManager, Notifications)
 
         for _, preset in ipairs(AccentPresets) do
             local dotBtn = Instance.new("TextButton")
-            dotBtn.Size = UDim2.new(0, 28, 0, 28)
+            dotBtn.Size = UDim2.new(0, 30, 0, 30)
             dotBtn.BackgroundColor3 = preset.Color
             dotBtn.BorderSizePixel = 0
             dotBtn.AutoButtonColor = false
             dotBtn.Text = ""
+            dotBtn.ZIndex = 6
             dotBtn.Parent = colorsHolder
             Instance.new("UICorner", dotBtn).CornerRadius = UDim.new(1, 0)
 
@@ -734,12 +790,13 @@ function Gui.Init(ModuleManager, Notifications)
             end)
         end
 
-        -- Row 5: Прозрачность окна
+        -- Row 5: Прозрачность окна (Slider с бегунком)
         local opCard = Instance.new("Frame")
-        opCard.Size = UDim2.new(1, -4, 0, 56)
+        opCard.Size = UDim2.new(1, -6, 0, 58)
         opCard.BackgroundColor3 = Theme.CardBg
         opCard.BorderSizePixel = 0
         opCard.LayoutOrder = 5
+        opCard.ZIndex = 4
         opCard.Parent = inspectorScroll
         Instance.new("UICorner", opCard).CornerRadius = UDim.new(0, 8)
 
@@ -751,30 +808,33 @@ function Gui.Init(ModuleManager, Notifications)
         opLbl.Size = UDim2.new(0.65, 0, 0, 20)
         opLbl.Position = UDim2.new(0, 14, 0, 6)
         opLbl.BackgroundTransparency = 1
-        opLbl.Font = HeavyFont
+        opLbl.Font = MainFont
         opLbl.Text = "Прозрачность окна"
         opLbl.TextColor3 = Theme.TextPrimary
         opLbl.TextSize = 13
         opLbl.TextXAlignment = Enum.TextXAlignment.Left
+        opLbl.ZIndex = 5
         opLbl.Parent = opCard
 
         local opValLbl = Instance.new("TextLabel")
         opValLbl.Size = UDim2.new(0.3, 0, 0, 20)
         opValLbl.Position = UDim2.new(0.7, -14, 0, 6)
         opValLbl.BackgroundTransparency = 1
-        opValLbl.Font = HeavyFont
+        opValLbl.Font = MainFont
         opValLbl.Text = string.format("%.0f%%", MenuConfig.WindowOpacity * 100)
         opValLbl.TextColor3 = MenuConfig.AccentColor
         registerAccent(opValLbl, "TextColor3")
         opValLbl.TextSize = 13
         opValLbl.TextXAlignment = Enum.TextXAlignment.Right
+        opValLbl.ZIndex = 5
         opValLbl.Parent = opCard
 
         local barBg = Instance.new("Frame")
-        barBg.Size = UDim2.new(1, -28, 0, 8)
+        barBg.Size = UDim2.new(1, -28, 0, 6)
         barBg.Position = UDim2.new(0, 14, 0, 36)
         barBg.BackgroundColor3 = Color3.fromRGB(36, 41, 60)
         barBg.BorderSizePixel = 0
+        barBg.ZIndex = 5
         barBg.Parent = opCard
         Instance.new("UICorner", barBg).CornerRadius = UDim.new(1, 0)
 
@@ -783,32 +843,41 @@ function Gui.Init(ModuleManager, Notifications)
         barFill.BackgroundColor3 = MenuConfig.AccentColor
         registerAccent(barFill, "BackgroundColor3")
         barFill.BorderSizePixel = 0
+        barFill.ZIndex = 6
         barFill.Parent = barBg
         Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
 
+        local thumb = Instance.new("Frame")
+        thumb.Size = UDim2.new(0, 16, 0, 16)
+        thumb.Position = UDim2.new(MenuConfig.WindowOpacity, -8, 0.5, -8)
+        thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        thumb.BorderSizePixel = 0
+        thumb.ZIndex = 7
+        thumb.Parent = barBg
+        Instance.new("UICorner", thumb).CornerRadius = UDim.new(1, 0)
+
         local draggingOp = false
+        local function updateOp(inputPos)
+            local absPos = barBg.AbsolutePosition.X
+            local absSize = barBg.AbsoluteSize.X
+            local p = math.clamp((inputPos.X - absPos) / absSize, 0.3, 1)
+            MenuConfig.WindowOpacity = p
+            mainWindow.BackgroundTransparency = 1 - p
+            barFill.Size = UDim2.new(p, 0, 1, 0)
+            thumb.Position = UDim2.new(p, -8, 0.5, -8)
+            opValLbl.Text = string.format("%.0f%%", p * 100)
+        end
+
         barBg.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 draggingOp = true
-                local absPos = barBg.AbsolutePosition.X
-                local absSize = barBg.AbsoluteSize.X
-                local p = math.clamp((input.Position.X - absPos) / absSize, 0.3, 1)
-                MenuConfig.WindowOpacity = p
-                mainWindow.BackgroundTransparency = 1 - p
-                barFill.Size = UDim2.new(p, 0, 1, 0)
-                opValLbl.Text = string.format("%.0f%%", p * 100)
+                updateOp(input.Position)
             end
         end)
 
         UserInputService.InputChanged:Connect(function(input)
             if draggingOp and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                local absPos = barBg.AbsolutePosition.X
-                local absSize = barBg.AbsoluteSize.X
-                local p = math.clamp((input.Position.X - absPos) / absSize, 0.3, 1)
-                MenuConfig.WindowOpacity = p
-                mainWindow.BackgroundTransparency = 1 - p
-                barFill.Size = UDim2.new(p, 0, 1, 0)
-                opValLbl.Text = string.format("%.0f%%", p * 100)
+                updateOp(input.Position)
             end
         end)
 
@@ -837,16 +906,18 @@ function Gui.Init(ModuleManager, Notifications)
             icon.BackgroundTransparency = 1
             icon.Image = Icons.Sliders
             icon.ImageColor3 = Theme.TextMuted
+            icon.ZIndex = 4
             icon.Parent = empty
 
             local lbl = Instance.new("TextLabel")
             lbl.Size = UDim2.new(1, 0, 0, 24)
             lbl.Position = UDim2.new(0, 0, 0.35, 56)
             lbl.BackgroundTransparency = 1
-            lbl.Font = HeavyFont
+            lbl.Font = MainFont
             lbl.Text = "Выберите модуль для настройки"
             lbl.TextColor3 = Theme.TextMuted
             lbl.TextSize = 14
+            lbl.ZIndex = 4
             lbl.Parent = empty
             return
         end
@@ -854,10 +925,11 @@ function Gui.Init(ModuleManager, Notifications)
         -- Header Card in Inspector
         local headerCardMod = Instance.new("Frame")
         headerCardMod.Name = "ModHeader"
-        headerCardMod.Size = UDim2.new(1, -4, 0, 60)
+        headerCardMod.Size = UDim2.new(1, -6, 0, 60)
         headerCardMod.BackgroundColor3 = Theme.CardBg
         headerCardMod.BorderSizePixel = 0
         headerCardMod.LayoutOrder = 1
+        headerCardMod.ZIndex = 4
         headerCardMod.Parent = inspectorScroll
         Instance.new("UICorner", headerCardMod).CornerRadius = UDim.new(0, 10)
 
@@ -869,23 +941,25 @@ function Gui.Init(ModuleManager, Notifications)
         modNameLbl.Size = UDim2.new(0.65, 0, 0, 24)
         modNameLbl.Position = UDim2.new(0, 14, 0, 8)
         modNameLbl.BackgroundTransparency = 1
-        modNameLbl.Font = BoldFont
+        modNameLbl.Font = MainFont
         modNameLbl.Text = mod.Name or "Unknown"
         modNameLbl.TextColor3 = Theme.TextPrimary
         modNameLbl.TextSize = 17
         modNameLbl.TextXAlignment = Enum.TextXAlignment.Left
+        modNameLbl.ZIndex = 5
         modNameLbl.Parent = headerCardMod
 
         local catTag = Instance.new("TextLabel")
         catTag.Size = UDim2.new(0.65, 0, 0, 16)
         catTag.Position = UDim2.new(0, 14, 0, 34)
         catTag.BackgroundTransparency = 1
-        catTag.Font = HeavyFont
+        catTag.Font = MainFont
         catTag.Text = "Категория: " .. (mod.Category or "Misc")
         catTag.TextColor3 = MenuConfig.AccentColor
         registerAccent(catTag, "TextColor3")
         catTag.TextSize = 12
         catTag.TextXAlignment = Enum.TextXAlignment.Left
+        catTag.ZIndex = 5
         catTag.Parent = headerCardMod
 
         -- Master Switch in Inspector Header
@@ -896,6 +970,7 @@ function Gui.Init(ModuleManager, Notifications)
         masterSwitch.BorderSizePixel = 0
         masterSwitch.AutoButtonColor = false
         masterSwitch.Text = ""
+        masterSwitch.ZIndex = 5
         masterSwitch.Parent = headerCardMod
         Instance.new("UICorner", masterSwitch).CornerRadius = UDim.new(1, 0)
 
@@ -904,6 +979,7 @@ function Gui.Init(ModuleManager, Notifications)
         masterThumb.Position = mod.Enabled and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
         masterThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         masterThumb.BorderSizePixel = 0
+        masterThumb.ZIndex = 6
         masterThumb.Parent = masterSwitch
         Instance.new("UICorner", masterThumb).CornerRadius = UDim.new(1, 0)
 
@@ -928,10 +1004,11 @@ function Gui.Init(ModuleManager, Notifications)
 
         -- Keybind Row
         local kbRow = Instance.new("Frame")
-        kbRow.Size = UDim2.new(1, -4, 0, 42)
+        kbRow.Size = UDim2.new(1, -6, 0, 42)
         kbRow.BackgroundColor3 = Theme.CardBg
         kbRow.BorderSizePixel = 0
         kbRow.LayoutOrder = 2
+        kbRow.ZIndex = 4
         kbRow.Parent = inspectorScroll
         Instance.new("UICorner", kbRow).CornerRadius = UDim.new(0, 8)
 
@@ -943,11 +1020,12 @@ function Gui.Init(ModuleManager, Notifications)
         kbLabel.Size = UDim2.new(0.5, 0, 1, 0)
         kbLabel.Position = UDim2.new(0, 14, 0, 0)
         kbLabel.BackgroundTransparency = 1
-        kbLabel.Font = HeavyFont
+        kbLabel.Font = MainFont
         kbLabel.Text = "Горячая клавиша"
         kbLabel.TextColor3 = Theme.TextSecondary
         kbLabel.TextSize = 13
         kbLabel.TextXAlignment = Enum.TextXAlignment.Left
+        kbLabel.ZIndex = 5
         kbLabel.Parent = kbRow
 
         local kbBtn = Instance.new("TextButton")
@@ -956,10 +1034,11 @@ function Gui.Init(ModuleManager, Notifications)
         kbBtn.BackgroundColor3 = Theme.PanelHeader
         kbBtn.BorderSizePixel = 0
         kbBtn.AutoButtonColor = false
-        kbBtn.Font = HeavyFont
+        kbBtn.Font = MainFont
         kbBtn.TextSize = 12
         kbBtn.TextColor3 = Color3.fromRGB(56, 189, 248)
         kbBtn.Text = ModuleManager.Keybinds[mod.Name] and ("[" .. ModuleManager.Keybinds[mod.Name] .. "]") or "[ Нет ]"
+        kbBtn.ZIndex = 5
         kbBtn.Parent = kbRow
         Instance.new("UICorner", kbBtn).CornerRadius = UDim.new(0, 6)
 
@@ -1032,10 +1111,11 @@ function Gui.Init(ModuleManager, Notifications)
                     end
 
                     local card = Instance.new("Frame")
-                    card.Size = UDim2.new(1, -4, 0, 56)
+                    card.Size = UDim2.new(1, -6, 0, 58)
                     card.BackgroundColor3 = Theme.CardBg
                     card.BorderSizePixel = 0
                     card.LayoutOrder = orderCounter
+                    card.ZIndex = 4
                     card.Parent = inspectorScroll
                     Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
 
@@ -1047,75 +1127,114 @@ function Gui.Init(ModuleManager, Notifications)
                     lbl.Size = UDim2.new(0.65, 0, 0, 22)
                     lbl.Position = UDim2.new(0, 14, 0, 6)
                     lbl.BackgroundTransparency = 1
-                    lbl.Font = HeavyFont
+                    lbl.Font = MainFont
                     lbl.Text = sName
                     lbl.TextColor3 = Theme.TextSecondary
                     lbl.TextSize = 13
                     lbl.TextXAlignment = Enum.TextXAlignment.Left
+                    lbl.ZIndex = 5
                     lbl.Parent = card
 
+                    -- Value Badge (Accent rounded pill)
+                    local valBadge = Instance.new("Frame")
+                    valBadge.Size = UDim2.new(0, 50, 0, 20)
+                    valBadge.Position = UDim2.new(1, -64, 0, 6)
+                    valBadge.BackgroundColor3 = Theme.PanelHeader
+                    valBadge.BorderSizePixel = 0
+                    valBadge.ZIndex = 5
+                    valBadge.Parent = card
+                    Instance.new("UICorner", valBadge).CornerRadius = UDim.new(0, 6)
+
+                    local vbStroke = Instance.new("UIStroke", valBadge)
+                    vbStroke.Color = MenuConfig.AccentColor
+                    registerAccent(vbStroke, "Color")
+                    vbStroke.Thickness = 1
+
                     local valLbl = Instance.new("TextLabel")
-                    valLbl.Size = UDim2.new(0.3, 0, 0, 22)
-                    valLbl.Position = UDim2.new(0.7, -14, 0, 6)
+                    valLbl.Size = UDim2.new(1, 0, 1, 0)
                     valLbl.BackgroundTransparency = 1
-                    valLbl.Font = HeavyFont
+                    valLbl.Font = MainFont
                     valLbl.Text = tostring(currentVal) .. sSuffix
                     valLbl.TextColor3 = MenuConfig.AccentColor
                     registerAccent(valLbl, "TextColor3")
-                    valLbl.TextSize = 13
-                    valLbl.TextXAlignment = Enum.TextXAlignment.Right
-                    valLbl.Parent = card
+                    valLbl.TextSize = 12
+                    valLbl.ZIndex = 6
+                    valLbl.Parent = valBadge
 
+                    -- Track Bar (with Laser Line & Real Circular Thumb Knob!)
                     local barBg = Instance.new("Frame")
-                    barBg.Size = UDim2.new(1, -28, 0, 8)
-                    barBg.Position = UDim2.new(0, 14, 0, 36)
+                    barBg.Size = UDim2.new(1, -28, 0, 6)
+                    barBg.Position = UDim2.new(0, 14, 0, 38)
                     barBg.BackgroundColor3 = Color3.fromRGB(36, 41, 60)
                     barBg.BorderSizePixel = 0
+                    barBg.ZIndex = 5
                     barBg.Parent = card
                     Instance.new("UICorner", barBg).CornerRadius = UDim.new(1, 0)
 
-                    local barFill = Instance.new("Frame")
                     local pct = math.clamp((currentVal - sMin) / (sMax - sMin), 0, 1)
+
+                    local barFill = Instance.new("Frame")
                     barFill.Size = UDim2.new(pct, 0, 1, 0)
                     barFill.BackgroundColor3 = MenuConfig.AccentColor
                     registerAccent(barFill, "BackgroundColor3")
                     barFill.BorderSizePixel = 0
+                    barFill.ZIndex = 6
                     barFill.Parent = barBg
                     Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
 
-                    local function updateBar()
-                        local p = math.clamp((currentVal - sMin) / (sMax - sMin), 0, 1)
-                        barFill.Size = UDim2.new(p, 0, 1, 0)
+                    -- Center Laser Line
+                    local laser = Instance.new("Frame")
+                    laser.Size = UDim2.new(1, 0, 0, 1.5)
+                    laser.Position = UDim2.new(0, 0, 0.5, -0.75)
+                    laser.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                    laser.BackgroundTransparency = 0.45
+                    laser.BorderSizePixel = 0
+                    laser.ZIndex = 7
+                    laser.Parent = barFill
+
+                    -- REAL VISIBLE DRAGGABLE THUMB KNOB!
+                    local thumb = Instance.new("Frame")
+                    thumb.Name = "SliderThumb"
+                    thumb.Size = UDim2.new(0, 16, 0, 16)
+                    thumb.Position = UDim2.new(pct, -8, 0.5, -8)
+                    thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                    thumb.BorderSizePixel = 0
+                    thumb.ZIndex = 8
+                    thumb.Parent = barBg
+                    Instance.new("UICorner", thumb).CornerRadius = UDim.new(1, 0)
+
+                    local thStroke = Instance.new("UIStroke", thumb)
+                    thStroke.Color = MenuConfig.AccentColor
+                    registerAccent(thStroke, "Color")
+                    thStroke.Thickness = 2
+
+                    local function updateSlider(inputX)
+                        local absPos = barBg.AbsolutePosition.X
+                        local absSize = barBg.AbsoluteSize.X
+                        local p = math.clamp((inputX - absPos) / absSize, 0, 1)
+                        local raw = sMin + p * (sMax - sMin)
+                        currentVal = math.floor(raw / sStep + 0.5) * sStep
+                        currentVal = math.clamp(currentVal, sMin, sMax)
+                        if not mod.__settings__ then mod.__settings__ = {} end
+                        mod.__settings__[sKey] = currentVal
+
+                        local newP = math.clamp((currentVal - sMin) / (sMax - sMin), 0, 1)
+                        barFill.Size = UDim2.new(newP, 0, 1, 0)
+                        thumb.Position = UDim2.new(newP, -8, 0.5, -8)
                         valLbl.Text = tostring(currentVal) .. sSuffix
                     end
 
                     local dragging = false
-                    barBg.InputBegan:Connect(function(input)
+                    card.InputBegan:Connect(function(input)
                         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                             dragging = true
-                            local absPos = barBg.AbsolutePosition.X
-                            local absSize = barBg.AbsoluteSize.X
-                            local p = math.clamp((input.Position.X - absPos) / absSize, 0, 1)
-                            local raw = sMin + p * (sMax - sMin)
-                            currentVal = math.floor(raw / sStep + 0.5) * sStep
-                            currentVal = math.clamp(currentVal, sMin, sMax)
-                            if not mod.__settings__ then mod.__settings__ = {} end
-                            mod.__settings__[sKey] = currentVal
-                            updateBar()
+                            updateSlider(input.Position.X)
                         end
                     end)
 
                     UserInputService.InputChanged:Connect(function(input)
                         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                            local absPos = barBg.AbsolutePosition.X
-                            local absSize = barBg.AbsoluteSize.X
-                            local p = math.clamp((input.Position.X - absPos) / absSize, 0, 1)
-                            local raw = sMin + p * (sMax - sMin)
-                            currentVal = math.floor(raw / sStep + 0.5) * sStep
-                            currentVal = math.clamp(currentVal, sMin, sMax)
-                            if not mod.__settings__ then mod.__settings__ = {} end
-                            mod.__settings__[sKey] = currentVal
-                            updateBar()
+                            updateSlider(input.Position.X)
                         end
                     end)
 
@@ -1132,10 +1251,11 @@ function Gui.Init(ModuleManager, Notifications)
                     end
 
                     local row = Instance.new("Frame")
-                    row.Size = UDim2.new(1, -4, 0, 42)
+                    row.Size = UDim2.new(1, -6, 0, 42)
                     row.BackgroundColor3 = Theme.CardBg
                     row.BorderSizePixel = 0
                     row.LayoutOrder = orderCounter
+                    row.ZIndex = 4
                     row.Parent = inspectorScroll
                     Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
 
@@ -1147,11 +1267,12 @@ function Gui.Init(ModuleManager, Notifications)
                     lbl.Size = UDim2.new(1, -66, 1, 0)
                     lbl.Position = UDim2.new(0, 14, 0, 0)
                     lbl.BackgroundTransparency = 1
-                    lbl.Font = HeavyFont
+                    lbl.Font = MainFont
                     lbl.Text = sName
                     lbl.TextColor3 = Theme.TextSecondary
                     lbl.TextSize = 13
                     lbl.TextXAlignment = Enum.TextXAlignment.Left
+                    lbl.ZIndex = 5
                     lbl.Parent = row
 
                     local sw = Instance.new("TextButton")
@@ -1162,6 +1283,7 @@ function Gui.Init(ModuleManager, Notifications)
                     sw.BorderSizePixel = 0
                     sw.AutoButtonColor = false
                     sw.Text = ""
+                    sw.ZIndex = 5
                     sw.Parent = row
                     Instance.new("UICorner", sw).CornerRadius = UDim.new(1, 0)
 
@@ -1170,6 +1292,7 @@ function Gui.Init(ModuleManager, Notifications)
                     th.Position = currentVal and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
                     th.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
                     th.BorderSizePixel = 0
+                    th.ZIndex = 6
                     th.Parent = sw
                     Instance.new("UICorner", th).CornerRadius = UDim.new(1, 0)
 
@@ -1189,10 +1312,11 @@ function Gui.Init(ModuleManager, Notifications)
                     end
 
                     local row = Instance.new("Frame")
-                    row.Size = UDim2.new(1, -4, 0, 42)
+                    row.Size = UDim2.new(1, -6, 0, 42)
                     row.BackgroundColor3 = Theme.CardBg
                     row.BorderSizePixel = 0
                     row.LayoutOrder = orderCounter
+                    row.ZIndex = 4
                     row.Parent = inspectorScroll
                     Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
 
@@ -1204,11 +1328,12 @@ function Gui.Init(ModuleManager, Notifications)
                     lbl.Size = UDim2.new(0.5, 0, 1, 0)
                     lbl.Position = UDim2.new(0, 14, 0, 0)
                     lbl.BackgroundTransparency = 1
-                    lbl.Font = HeavyFont
+                    lbl.Font = MainFont
                     lbl.Text = sName
                     lbl.TextColor3 = Theme.TextSecondary
                     lbl.TextSize = 13
                     lbl.TextXAlignment = Enum.TextXAlignment.Left
+                    lbl.ZIndex = 5
                     lbl.Parent = row
 
                     local dropBtn = Instance.new("TextButton")
@@ -1217,10 +1342,11 @@ function Gui.Init(ModuleManager, Notifications)
                     dropBtn.BackgroundColor3 = Theme.PanelHeader
                     dropBtn.BorderSizePixel = 0
                     dropBtn.AutoButtonColor = false
-                    dropBtn.Font = HeavyFont
+                    dropBtn.Font = MainFont
                     dropBtn.Text = tostring(currentVal) .. "  "
                     dropBtn.TextColor3 = Theme.TextPrimary
                     dropBtn.TextSize = 12
+                    dropBtn.ZIndex = 5
                     dropBtn.Parent = row
                     Instance.new("UICorner", dropBtn).CornerRadius = UDim.new(0, 6)
 
@@ -1230,6 +1356,7 @@ function Gui.Init(ModuleManager, Notifications)
                     arrowImg.BackgroundTransparency = 1
                     arrowImg.Image = Icons.ChevronDown
                     arrowImg.ImageColor3 = Theme.TextMuted
+                    arrowImg.ZIndex = 6
                     arrowImg.Parent = dropBtn
 
                     local curIdx = 1
@@ -1250,20 +1377,22 @@ function Gui.Init(ModuleManager, Notifications)
         else
             -- Empty Settings Row
             local emptyRow = Instance.new("Frame")
-            emptyRow.Size = UDim2.new(1, -4, 0, 60)
+            emptyRow.Size = UDim2.new(1, -6, 0, 60)
             emptyRow.BackgroundColor3 = Theme.CardBg
             emptyRow.BorderSizePixel = 0
             emptyRow.LayoutOrder = 3
+            emptyRow.ZIndex = 4
             emptyRow.Parent = inspectorScroll
             Instance.new("UICorner", emptyRow).CornerRadius = UDim.new(0, 8)
 
             local noSettingsLbl = Instance.new("TextLabel")
             noSettingsLbl.Size = UDim2.new(1, 0, 1, 0)
             noSettingsLbl.BackgroundTransparency = 1
-            noSettingsLbl.Font = HeavyFont
+            noSettingsLbl.Font = MainFont
             noSettingsLbl.Text = "У данной функции нет дополнительных параметров"
             noSettingsLbl.TextColor3 = Theme.TextMuted
             noSettingsLbl.TextSize = 12
+            noSettingsLbl.ZIndex = 5
             noSettingsLbl.Parent = emptyRow
         end
     end
@@ -1285,18 +1414,23 @@ function Gui.Init(ModuleManager, Notifications)
         else
             moduleListFrame.Visible = true
             divider.Visible = true
-            inspectorFrame.Position = UDim2.new(0, MODULE_LIST_WIDTH + 30, 0, 8)
-            inspectorFrame.Size = UDim2.new(1, -MODULE_LIST_WIDTH - 40, 1, -16)
+            inspectorFrame.Position = UDim2.new(0, MODULE_LIST_WIDTH + 26, 0, 8)
+            inspectorFrame.Size = UDim2.new(1, -MODULE_LIST_WIDTH - 36, 1, -16)
         end
 
         local listToDisplay = {}
+        local seenNames = {}
         local q = searchQuery:lower()
 
+        -- Дедупликация: ни один модуль не может добавиться дважды!
         for _, mod in ipairs(ModuleManager.Modules) do
-            local matchesCat = (selectedCategory == "ALL") or (mod.Category == selectedCategory)
-            local matchesSearch = (q == "") or (string.find((mod.Name or ""):lower(), q, 1, true) ~= nil)
-            if matchesCat and matchesSearch then
-                table.insert(listToDisplay, mod)
+            if not seenNames[mod.Name] then
+                seenNames[mod.Name] = true
+                local matchesCat = (selectedCategory == "ALL") or (mod.Category == selectedCategory)
+                local matchesSearch = (q == "") or (string.find((mod.Name or ""):lower(), q, 1, true) ~= nil)
+                if matchesCat and matchesSearch then
+                    table.insert(listToDisplay, mod)
+                end
             end
         end
 
@@ -1309,10 +1443,11 @@ function Gui.Init(ModuleManager, Notifications)
             local emptyLbl = Instance.new("TextLabel")
             emptyLbl.Size = UDim2.new(1, 0, 1, 0)
             emptyLbl.BackgroundTransparency = 1
-            emptyLbl.Font = HeavyFont
+            emptyLbl.Font = MainFont
             emptyLbl.Text = "Ничего не найдено"
             emptyLbl.TextColor3 = Theme.TextMuted
             emptyLbl.TextSize = 13
+            emptyLbl.ZIndex = 4
             emptyLbl.Parent = emptyCard
             renderInspector(nil)
             return
@@ -1330,9 +1465,10 @@ function Gui.Init(ModuleManager, Notifications)
         for _, mod in ipairs(listToDisplay) do
             local card = Instance.new("Frame")
             card.Name = mod.Name
-            card.Size = UDim2.new(1, -6, 0, 44) -- Высота 44px (удобно, просторно, ничего не обрезается!)
+            card.Size = UDim2.new(1, -10, 0, 42) -- Отступ от скроллбара, чтобы края не резались!
             card.BackgroundColor3 = (selectedModule == mod) and Theme.CardSelected or Theme.CardBg
             card.BorderSizePixel = 0
+            card.ZIndex = 4
             card.Parent = moduleListFrame
             Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
 
@@ -1340,39 +1476,42 @@ function Gui.Init(ModuleManager, Notifications)
             cardStroke.Color = (selectedModule == mod) and MenuConfig.AccentColor or Theme.StrokeDim
             cardStroke.Thickness = 1.2
 
-            -- Module Name (Bold font 14px, wide enough)
+            -- Module Name (Bold font 14px, spacious)
             local nameLbl = Instance.new("TextLabel")
-            nameLbl.Size = UDim2.new(1, -86, 1, 0)
+            nameLbl.Size = UDim2.new(1, -95, 1, 0)
             nameLbl.Position = UDim2.new(0, 12, 0, 0)
             nameLbl.BackgroundTransparency = 1
-            nameLbl.Font = BoldFont
+            nameLbl.Font = MainFont
             nameLbl.Text = mod.Name or ""
             nameLbl.TextColor3 = mod.Enabled and Theme.TextPrimary or Theme.TextSecondary
             nameLbl.TextSize = 14
             nameLbl.TextXAlignment = Enum.TextXAlignment.Left
             nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
+            nameLbl.ZIndex = 5
             nameLbl.Parent = card
 
             -- Keybind indicator tag
             local kbTag = Instance.new("TextLabel")
             kbTag.Size = UDim2.new(0, 30, 0, 16)
-            kbTag.Position = UDim2.new(1, -82, 0.5, -8)
+            kbTag.Position = UDim2.new(1, -85, 0.5, -8)
             kbTag.BackgroundTransparency = 1
-            kbTag.Font = HeavyFont
+            kbTag.Font = MainFont
             kbTag.Text = ModuleManager.Keybinds[mod.Name] and ("[" .. ModuleManager.Keybinds[mod.Name]:sub(1, 4) .. "]") or ""
             kbTag.TextColor3 = Theme.TextMuted
             kbTag.TextSize = 10
             kbTag.TextXAlignment = Enum.TextXAlignment.Right
+            kbTag.ZIndex = 5
             kbTag.Parent = card
 
             -- Modern Toggle Switch on Card
             local sw = Instance.new("TextButton")
-            sw.Size = UDim2.new(0, 38, 0, 20)
-            sw.Position = UDim2.new(1, -48, 0.5, -10)
+            sw.Size = UDim2.new(0, 40, 0, 20)
+            sw.Position = UDim2.new(1, -50, 0.5, -10)
             sw.BackgroundColor3 = mod.Enabled and MenuConfig.AccentColor or Theme.SwitchOff
             sw.BorderSizePixel = 0
             sw.AutoButtonColor = false
             sw.Text = ""
+            sw.ZIndex = 5
             sw.Parent = card
             Instance.new("UICorner", sw).CornerRadius = UDim.new(1, 0)
 
@@ -1381,15 +1520,17 @@ function Gui.Init(ModuleManager, Notifications)
             th.Position = mod.Enabled and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
             th.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             th.BorderSizePixel = 0
+            th.ZIndex = 6
             th.Parent = sw
             Instance.new("UICorner", th).CornerRadius = UDim.new(1, 0)
 
             -- Invisible button over card body to select module
             local selectBtn = Instance.new("TextButton")
-            selectBtn.Size = UDim2.new(1, -52, 1, 0)
+            selectBtn.Size = UDim2.new(1, -54, 1, 0)
             selectBtn.Position = UDim2.new(0, 0, 0, 0)
             selectBtn.BackgroundTransparency = 1
             selectBtn.Text = ""
+            selectBtn.ZIndex = 5
             selectBtn.Parent = card
 
             local function updateCardVisuals()
@@ -1459,6 +1600,7 @@ function Gui.Init(ModuleManager, Notifications)
             btn.BorderSizePixel = 0
             btn.AutoButtonColor = false
             btn.Text = ""
+            btn.ZIndex = 4
             btn.Parent = catContainer
             Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
 
@@ -1473,17 +1615,19 @@ function Gui.Init(ModuleManager, Notifications)
             iconImg.BackgroundTransparency = 1
             iconImg.Image = cat.Icon
             iconImg.ImageColor3 = isSelected and MenuConfig.AccentColor or Theme.TextMuted
+            iconImg.ZIndex = 5
             iconImg.Parent = btn
 
             local nameLbl = Instance.new("TextLabel")
             nameLbl.Size = UDim2.new(1, -38, 1, 0)
             nameLbl.Position = UDim2.new(0, 36, 0, 0)
             nameLbl.BackgroundTransparency = 1
-            nameLbl.Font = BoldFont
+            nameLbl.Font = MainFont
             nameLbl.Text = cat.Name
             nameLbl.TextColor3 = isSelected and Theme.TextPrimary or Theme.TextSecondary
             nameLbl.TextSize = 13
             nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+            nameLbl.ZIndex = 5
             nameLbl.Parent = btn
 
             btn.MouseButton1Click:Connect(function()
@@ -1533,7 +1677,7 @@ function Gui.Init(ModuleManager, Notifications)
         tween(reloadBtn, { BackgroundColor3 = Theme.CardHover, ImageColor3 = Theme.TextPrimary })
     end)
     reloadBtn.MouseLeave:Connect(function()
-        tween(reloadBtn, { BackgroundColor3 = Theme.PanelHeader, ImageColor3 = Theme.TextSecondary })
+        tween(reloadBtn, { BackgroundColor3 = Color3.fromRGB(26, 30, 46), ImageColor3 = Theme.TextSecondary })
     end)
 
     reloadBtn.MouseButton1Click:Connect(function()
@@ -1553,7 +1697,7 @@ function Gui.Init(ModuleManager, Notifications)
         tween(closeBtn, { BackgroundColor3 = Theme.Danger, ImageColor3 = Color3.fromRGB(255, 255, 255) })
     end)
     closeBtn.MouseLeave:Connect(function()
-        tween(closeBtn, { BackgroundColor3 = Theme.PanelHeader, ImageColor3 = Theme.TextSecondary })
+        tween(closeBtn, { BackgroundColor3 = Color3.fromRGB(26, 30, 46), ImageColor3 = Theme.TextSecondary })
     end)
 
     closeBtn.MouseButton1Click:Connect(function()
@@ -1563,15 +1707,15 @@ function Gui.Init(ModuleManager, Notifications)
 
     -- ========== DRAGGING & LIVE RESIZING LOGIC ==========
     local draggingWindow = false
-    local dragStartPos = nil
-    local frameStartPos = nil
+    local dragStartMouse = nil
+    local frameStartPos  = nil
 
     local function setupDragOn(inst)
         inst.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 draggingWindow = true
-                dragStartPos = input.Position
-                frameStartPos = mainWindow.Position
+                dragStartMouse = input.Position
+                frameStartPos  = mainWindow.Position
             end
         end)
     end
@@ -1581,11 +1725,13 @@ function Gui.Init(ModuleManager, Notifications)
 
     UserInputService.InputChanged:Connect(function(input)
         if draggingWindow and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStartPos
-            mainWindow.Position = UDim2.new(
+            local delta = input.Position - dragStartMouse
+            local newPos = UDim2.new(
                 frameStartPos.X.Scale, frameStartPos.X.Offset + delta.X,
                 frameStartPos.Y.Scale, frameStartPos.Y.Offset + delta.Y
             )
+            mainWindow.Position = newPos
+            glowShadow.Position = UDim2.new(newPos.X.Scale, newPos.X.Offset - 30, newPos.Y.Scale, newPos.Y.Offset - 30)
         end
 
         if resizingWindow and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
@@ -1595,6 +1741,7 @@ function Gui.Init(ModuleManager, Notifications)
             currentWidth = newW
             currentHeight = newH
             mainWindow.Size = UDim2.new(0, newW, 0, newH)
+            glowShadow.Size = UDim2.new(0, newW + 60, 0, newH + 60)
         end
     end)
 
@@ -1612,10 +1759,18 @@ function Gui.Init(ModuleManager, Notifications)
     local function playOpenAnim()
         screenGui.Enabled = true
         mainWindow.Position = UDim2.new(0.5, -currentWidth / 2, 0.5, -currentHeight / 2 - 24)
+        glowShadow.Position = UDim2.new(0.5, -currentWidth / 2 - 30, 0.5, -currentHeight / 2 - 54)
+
         TweenService:Create(
             mainWindow,
             TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
             { Position = UDim2.new(0.5, -currentWidth / 2, 0.5, -currentHeight / 2) }
+        ):Play()
+
+        TweenService:Create(
+            glowShadow,
+            TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+            { Position = UDim2.new(0.5, -currentWidth / 2 - 30, 0.5, -currentHeight / 2 - 30) }
         ):Play()
     end
 
@@ -1626,6 +1781,13 @@ function Gui.Init(ModuleManager, Notifications)
             { Position = UDim2.new(0.5, -currentWidth / 2, 0.5, -currentHeight / 2 - 24) }
         )
         t:Play()
+
+        TweenService:Create(
+            glowShadow,
+            TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            { Position = UDim2.new(0.5, -currentWidth / 2 - 30, 0.5, -currentHeight / 2 - 54) }
+        ):Play()
+
         t.Completed:Connect(function()
             if not menuOpen then
                 screenGui.Enabled = false
